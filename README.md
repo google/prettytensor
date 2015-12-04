@@ -72,7 +72,7 @@ You can also add any existing TensorFlow function to the chain using `apply`.
 `apply` applies the current Tensor as the first argument and takes all the other
 arguments as normal.
 
-*Note:* because apply is so powerful, Pretty Tensor doesn't try to wrap the
+*Note:* because apply is so generic, Pretty Tensor doesn't try to wrap the
 world.
 
 #### Plays well with other libraries
@@ -165,7 +165,7 @@ See more details in [PrettyTensor class](docs/PrettyTensor.md).
 
 Eider Moore (eiderman)
 
-with contribution from:
+with key contributions from:
 
 * Hubert Eichner
 * Oliver Lange
