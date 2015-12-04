@@ -129,10 +129,10 @@ values (e.g. train and test using different widths), then it will break.
 
 - - -
 
-[TOC]
 
 
-## add_loss(loss, name=None) {#add_loss}
+
+## <a name="add_loss"></a>add_loss(loss, name=None)
 
 
 
@@ -144,7 +144,7 @@ Adds a loss and returns a wrapper for that loss.
 
 - - -
 
-## apply(operation) {#apply}
+## <a name="apply"></a>apply(operation)
 
 
 
@@ -166,7 +166,7 @@ A new layer with operation applied.
 
 - - -
 
-## apply_with_summary(operation) {#apply_with_summary}
+## <a name="apply_with_summary"></a>apply_with_summary(operation)
 
 
 
@@ -188,7 +188,7 @@ A new layer with operation applied.
 
 - - -
 
-## as_layer() {#as_layer}
+## <a name="as_layer"></a>as_layer()
 
 
 
@@ -206,7 +206,7 @@ An immutable PrettyTensor.
 
 - - -
 
-## attach_template(_template, _key) {#attach_template}
+## <a name="attach_template"></a>attach_template(_template, _key)
 
 
 
@@ -235,7 +235,7 @@ A new layer with operation applied.
 
 - - -
 
-## average_pool(kernel, stride, edges=SAME, name=None) {#average_pool}
+## <a name="average_pool"></a>average_pool(kernel, stride, edges=SAME, name=None)
 
 
 
@@ -261,7 +261,7 @@ Handle to this layer.
 
 - - -
 
-## batch_normalize(name=None, learned_moments_update_rate=None, variance_epsilon=None, scale_after_normalization=None, phase=Phase.train) {#batch_normalize}
+## <a name="batch_normalize"></a>batch_normalize(name=None, learned_moments_update_rate=None, variance_epsilon=None, scale_after_normalization=None, phase=Phase.train)
 
 
 
@@ -292,7 +292,7 @@ Handle to the generated layer.
 
 - - -
 
-## binary_cross_entropy_with_logits(target, name=None, loss_weight=None, per_example_weights=None) {#binary_cross_entropy_with_logits}
+## <a name="binary_cross_entropy_with_logits"></a>binary_cross_entropy_with_logits(target, name=None, loss_weight=None, per_example_weights=None)
 
 
 
@@ -322,7 +322,7 @@ Binary cross entropy loss after sigmoid operation.
 
 - - -
 
-## cleave_sequence(unroll=None) {#cleave_sequence}
+## <a name="cleave_sequence"></a>cleave_sequence(unroll=None)
 
 
 
@@ -350,7 +350,7 @@ A PrettyTensor containing an array of tensors.
 
 - - -
 
-## concat(concat_dim, other_tensors) {#concat}
+## <a name="concat"></a>concat(concat_dim, other_tensors)
 
 
 
@@ -374,7 +374,7 @@ A new PrettyTensor.
 
 - - -
 
-## conv2d(kernel, depth, name=None, stride=None, activation_fn=None, l2loss=None, init=None, stddev=None, bias=True, edges=SAME, batch_normalize=False) {#conv2d}
+## <a name="conv2d"></a>conv2d(kernel, depth, name=None, stride=None, activation_fn=None, l2loss=None, init=None, stddev=None, bias=True, edges=SAME, batch_normalize=False)
 
 
 
@@ -419,7 +419,7 @@ Handle to the generated layer.
 
 - - -
 
-## cross_entropy(labels, name=None, loss_weight=None, per_example_weights=None) {#cross_entropy}
+## <a name="cross_entropy"></a>cross_entropy(labels, name=None, loss_weight=None, per_example_weights=None)
 
 
 
@@ -447,7 +447,7 @@ A loss.
 
 - - -
 
-## diagonal_matrix_mul(init=None, stddev=None, l2loss=None) {#diagonal_matrix_mul}
+## <a name="diagonal_matrix_mul"></a>diagonal_matrix_mul(init=None, stddev=None, l2loss=None)
 
 
 
@@ -477,7 +477,7 @@ A Pretty Tensor handle to the layer.
 
 - - -
 
-## dropout(keep_prob, phase=Phase.train, name=None) {#dropout}
+## <a name="dropout"></a>dropout(keep_prob, phase=Phase.train, name=None)
 
 
 
@@ -489,7 +489,7 @@ Aplies dropout if this is in the train phase.
 
 - - -
 
-## embedding_lookup(embedding_count, embedding_shape, name=None, init=None) {#embedding_lookup}
+## <a name="embedding_lookup"></a>embedding_lookup(embedding_count, embedding_shape, name=None, init=None)
 
 
 
@@ -529,7 +529,7 @@ input_layer
 
 - - -
 
-## eval(feed_dict=None, session=None) {#eval}
+## <a name="eval"></a>eval(feed_dict=None, session=None)
 
 
 
@@ -561,7 +561,7 @@ A numpy array corresponding to the value of this tensor.
 
 - - -
 
-## evaluate_classifier(labels, per_example_weights=None, topk=1, name=None, phase=Phase.train) {#evaluate_classifier}
+## <a name="evaluate_classifier"></a>evaluate_classifier(labels, per_example_weights=None, topk=1, name=None, phase=Phase.train)
 
 
 
@@ -591,7 +591,7 @@ A Pretty Tensor with the ratio of correct to total examples seen..
 
 - - -
 
-## flatten(preserve_batch=True) {#flatten}
+## <a name="flatten"></a>flatten(preserve_batch=True)
 
 
 
@@ -614,7 +614,7 @@ A LayerWrapper with the flattened tensor.
 
 - - -
 
-## fully_connected(size, name=None, activation_fn=None, l2loss=None, init=None, stddev=None, bias=True, bias_init=0.0) {#fully_connected}
+## <a name="fully_connected"></a>fully_connected(size, name=None, activation_fn=None, l2loss=None, init=None, stddev=None, bias=True, bias_init=0.0)
 
 
 
@@ -653,14 +653,14 @@ A Pretty Tensor handle to the layer.
 
 - - -
 
-## get_shape() {#get_shape}
+## <a name="get_shape"></a>get_shape()
 
 
 
 
 - - -
 
-## gru_cell(state, num_units, bias=True, stddev=None, init=None) {#gru_cell}
+## <a name="gru_cell"></a>gru_cell(state, num_units, bias=True, stddev=None, init=None)
 
 
 
@@ -685,7 +685,7 @@ A RecurrentResult.
 
 - - -
 
-## is_sequence() {#is_sequence}
+## <a name="is_sequence"></a>is_sequence()
 
 
 
@@ -697,7 +697,7 @@ Returns True if this holds a sequence and False if it holds a Tensor.
 
 - - -
 
-## is_sequential_builder() {#is_sequential_builder}
+## <a name="is_sequential_builder"></a>is_sequential_builder()
 
 
 
@@ -716,7 +716,7 @@ Whether this is a sequential builder.
 
 - - -
 
-## join(others, include_self=True, join_function=None) {#join}
+## <a name="join"></a>join(others, include_self=True, join_function=None)
 
 
 
@@ -740,7 +740,7 @@ self.
 
 - - -
 
-## l1_regression(target, name=None, loss_weight=None, per_example_weights=None) {#l1_regression}
+## <a name="l1_regression"></a>l1_regression(target, name=None, loss_weight=None, per_example_weights=None)
 
 
 
@@ -752,7 +752,7 @@ Applies an L1 Regression (Sum of Absolute Error) to the target.
 
 - - -
 
-## l2_regression(target, name=None, loss_weight=None, per_example_weights=None) {#l2_regression}
+## <a name="l2_regression"></a>l2_regression(target, name=None, loss_weight=None, per_example_weights=None)
 
 
 
@@ -764,7 +764,7 @@ Applies an L2 Regression (Sum of Squared Error) to the target.
 
 - - -
 
-## lstm_cell(states, num_units, bias=True, peephole=True, stddev=None, init=None) {#lstm_cell}
+## <a name="lstm_cell"></a>lstm_cell(states, num_units, bias=True, peephole=True, stddev=None, init=None)
 
 
 
@@ -791,7 +791,7 @@ A RecurrentResult.
 
 - - -
 
-## map(fn) {#map}
+## <a name="map"></a>map(fn)
 
 
 
@@ -814,7 +814,7 @@ A new sequence Pretty Tensor.
 
 - - -
 
-## max_pool(kernel, stride, edges=SAME, name=None) {#max_pool}
+## <a name="max_pool"></a>max_pool(kernel, stride, edges=SAME, name=None)
 
 
 
@@ -840,7 +840,7 @@ Handle to this layer.
 
 - - -
 
-## reshape(shape_spec) {#reshape}
+## <a name="reshape"></a>reshape(shape_spec)
 
 
 
@@ -888,7 +888,7 @@ A LayerWrapper with the reshaped tensor.
 
 - - -
 
-## sequence_gru(num_units, bias=True, name=None, stddev=None, init=None) {#sequence_gru}
+## <a name="sequence_gru"></a>sequence_gru(num_units, bias=True, name=None, stddev=None, init=None)
 
 
 
@@ -920,7 +920,7 @@ A sequence with the result at each timestep.
 
 - - -
 
-## sequence_lstm(num_units, bias=True, peephole=True, name=None, stddev=None, init=None) {#sequence_lstm}
+## <a name="sequence_lstm"></a>sequence_lstm(num_units, bias=True, peephole=True, name=None, stddev=None, init=None)
 
 
 
@@ -953,7 +953,7 @@ A sequence with the result at each timestep.
 
 - - -
 
-## slice(begin, size) {#slice}
+## <a name="slice"></a>slice(begin, size)
 
 
 
@@ -1003,7 +1003,7 @@ A tensor with the selected slice.
 
 - - -
 
-## softmax(labels=None, name=None, loss_weight=None, per_example_weights=None) {#softmax}
+## <a name="softmax"></a>softmax(labels=None, name=None, loss_weight=None, per_example_weights=None)
 
 
 
@@ -1031,7 +1031,7 @@ A tuple of the a handle to softmax and a handle to the loss tensor.
 
 - - -
 
-## softmax_activation() {#softmax_activation}
+## <a name="softmax_activation"></a>softmax_activation()
 
 
 
@@ -1049,7 +1049,7 @@ Computes the softmax.
 
 - - -
 
-## softmax_classifier(class_count, labels=None, name=None, loss_weight=None, per_example_weights=None) {#softmax_classifier}
+## <a name="softmax_classifier"></a>softmax_classifier(class_count, labels=None, name=None, loss_weight=None, per_example_weights=None)
 
 
 
@@ -1078,7 +1078,7 @@ A tuple of the softmax's name and the loss tensor's name in m.bits.
 
 - - -
 
-## split(split_dim=0, num_splits=2) {#split}
+## <a name="split"></a>split(split_dim=0, num_splits=2)
 
 
 
@@ -1109,7 +1109,7 @@ A list of PrettyTensors.
 
 - - -
 
-## squash_sequence() {#squash_sequence}
+## <a name="squash_sequence"></a>squash_sequence()
 
 
 
@@ -1137,7 +1137,7 @@ Defaults are assigned such that cleave_sequence requires no args.
 
 - - -
 
-## squeeze(squeeze_dims=None) {#squeeze}
+## <a name="squeeze"></a>squeeze(squeeze_dims=None)
 
 
 
@@ -1161,7 +1161,7 @@ The sequeezed tensor.
 
 - - -
 
-## stop_gradient() {#stop_gradient}
+## <a name="stop_gradient"></a>stop_gradient()
 
 
 
@@ -1181,7 +1181,7 @@ This works on both sequence and regular Pretty Tensors.
 
 - - -
 
-## to_dense_one_hot(class_count) {#to_dense_one_hot}
+## <a name="to_dense_one_hot"></a>to_dense_one_hot(class_count)
 
 
 
@@ -1207,7 +1207,7 @@ One dense vector for each item in the batch.
 
 - - -
 
-## unzip(split_dim=0, num_splits=2) {#unzip}
+## <a name="unzip"></a>unzip(split_dim=0, num_splits=2)
 
 
 
@@ -1238,7 +1238,7 @@ A list of PrettyTensors.
 
 - - -
 
-## with_defaults(... {#with_defaults}
+## <a name="with_defaults"></a>with_defaults(...
 
 Many Pretty Tensor methods support setting defaults. The supported defaults and methods that use them are:
 
@@ -1278,7 +1278,7 @@ Many Pretty Tensor methods support setting defaults. The supported defaults and 
 * `variance_epsilon`:
     * [batch_normalize](PrettyTensor.md#batch_normalize)
 
-## with_name(name) {#with_name}
+## <a name="with_name"></a>with_name(name)
 
 
 
@@ -1290,7 +1290,7 @@ Sets the name scope for future operations.
 
 - - -
 
-## with_sequence(sequence) {#with_sequence}
+## <a name="with_sequence"></a>with_sequence(sequence)
 
 
 
@@ -1302,7 +1302,7 @@ Returns a PrettyTensor that points to sequence.
 
 - - -
 
-## with_tensor(tensor) {#with_tensor}
+## <a name="with_tensor"></a>with_tensor(tensor)
 
 
 
