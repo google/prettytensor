@@ -52,7 +52,9 @@ def create_model(text_in,
                  phase=pt.Phase.train):
   """Creates a model for running baby names."""
   with pt.defaults_scope(phase=phase, l2loss=0.00001):
-    embedded = text_in.embedding_lookup(CHARS, [EMBEDDING_SIZE])
+    # The embedding lookup must be placed on a cpu.
+    with tf.device('/cpu:0'):
+      embedded = text_in.embedding_lookup(CHARS, [EMBEDDING_SIZE])
     # We need to cleave the sequence because sequence lstm expect each
     # timestep to be in its own Tensor.
     lstm = (embedded.cleave_sequence(timesteps).sequence_lstm(CHARS))

@@ -53,7 +53,9 @@ def create_model(text_in, timesteps, phase):
     The logits.
   """
   with pt.defaults_scope(activation_fn=tf.nn.relu, l2loss=0.00001):
-    embedded = text_in.embedding_lookup(CHARS, [EMBEDDING_SIZE])
+    # The embedding lookup must be placed on a cpu.
+    with tf.device('/cpu:0'):
+      embedded = text_in.embedding_lookup(CHARS, [EMBEDDING_SIZE])
     # Because the sequence LSTM expects each timestep to be its own Tensor,
     # we need to cleave the sequence.
     # Below we can build a stacked 2 layer LSTM by just chaining them together.

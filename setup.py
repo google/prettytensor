@@ -43,6 +43,10 @@ setup(
     author_email='opensource@google.com',
     # Contained modules and scripts.
     packages=find_packages(),
+    include_package_data=True,
+    package_data={
+        'prettytensor': ['tutorial/baby_names.csv']
+        },
     entry_points={
         'console_scripts': CONSOLE_SCRIPTS
         },
