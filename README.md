@@ -26,7 +26,9 @@ See the tutorial directory for samples:
 
 The easiest installation is just to use pip:
 
-    pip install prettytensor
+1. Follow the instructions at
+    [tensorflow.org](https://www.tensorflow.org/versions/master/get_started/os_setup.html#pip_install)
+2. `pip install prettytensor`
 
 
 ## Quick start
