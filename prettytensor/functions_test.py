@@ -14,14 +14,28 @@ import unittest
 
 
 import numpy
+from numpy import linalg
 from numpy import testing
-import numpy.linalg
-from scipy.spatial import distance
 import tensorflow as tf
 
 from prettytensor import functions
 
 TOLERANCE = 0.000001
+
+
+# Distance functions used in tests.  These are defined here instead of using
+# scipy so the open source tests don't depend on such a huge module for 3
+# 1 line functions.
+def cosine(u, v):
+  return 1.0 - numpy.dot(u, v) / (linalg.norm(u) * linalg.norm(v))
+
+
+def cityblock(u, v):
+  return numpy.abs(u - v).sum()
+
+
+def euclidean(u, v):
+  return linalg.norm(u - v)
 
 
 class TensorFlowOpTest(unittest.TestCase):
@@ -105,10 +119,10 @@ class TensorFlowOpTest(unittest.TestCase):
     n1 = numpy.array([[1., 2., 3., 4.], [1., 1., 1., 1.]], dtype=numpy.float32)
     n2 = numpy.array([[5., 6., 7., -8.], [1., 1., 1., 1.]], dtype=numpy.float32)
     out = self.Run(functions.cos_distance(n1, n2))
+
     testing.assert_allclose(
         out[0],
-        numpy.array(
-            [distance.cosine(n1[0], n2[0]), distance.cosine(n1[1], n2[1])]),
+        numpy.array([cosine(n1[0], n2[0]), cosine(n1[1], n2[1])]),
         rtol=TOLERANCE)
 
   def testL1Distance(self):
@@ -118,7 +132,7 @@ class TensorFlowOpTest(unittest.TestCase):
     testing.assert_allclose(
         out[0],
         numpy.array(
-            [distance.cityblock(n1[0], n2[0]), distance.cityblock(n1[1], n2[1])
+            [cityblock(n1[0], n2[0]), cityblock(n1[1], n2[1])
             ]),
         rtol=TOLERANCE)
 
@@ -129,7 +143,7 @@ class TensorFlowOpTest(unittest.TestCase):
     testing.assert_allclose(
         out[0],
         numpy.array(
-            [distance.euclidean(n1[0], n2[0]), distance.euclidean(n1[1], n2[1])
+            [euclidean(n1[0], n2[0]), euclidean(n1[1], n2[1])
             ]),
         rtol=TOLERANCE)
 
@@ -141,7 +155,7 @@ class TensorFlowOpTest(unittest.TestCase):
         out[0],
         numpy.power(
             numpy.array(
-                [distance.euclidean(n1[0], n2[0]), distance.euclidean(
+                [euclidean(n1[0], n2[0]), euclidean(
                     n1[1], n2[1])]), 2),
         rtol=TOLERANCE)
 
@@ -162,8 +176,8 @@ class TensorFlowOpTest(unittest.TestCase):
     n2 = numpy.array([[5., 6., 7., -8.], [1., 1., 1., 1.]], dtype=numpy.float32)
     out = self.Run(functions.cos_distance(n1, n2))
     expected = numpy.array(
-        [[distance.cosine(n1[0, 0], n2[0]), distance.cosine(n1[0, 1], n2[1])],
-         [distance.cosine(n1[1, 0], n2[0]), distance.cosine(n1[1, 1], n2[1])]])
+        [[cosine(n1[0, 0], n2[0]), cosine(n1[0, 1], n2[1])],
+         [cosine(n1[1, 0], n2[0]), cosine(n1[1, 1], n2[1])]])
     testing.assert_allclose(expected, out[0], atol=TOLERANCE)
 
   def testL1DistanceWithBroadcast(self):
@@ -173,9 +187,9 @@ class TensorFlowOpTest(unittest.TestCase):
     n2 = numpy.array([[5., 6., 7., -8.], [1., 1., 1., 1.]], dtype=numpy.float32)
     out = self.Run(functions.l1_distance(n1, n2))
     expected = numpy.array(
-        [[distance.cityblock(n1[0, 0], n2[0]), distance.cityblock(
-            n1[0, 1], n2[1])], [distance.cityblock(n1[1, 0], n2[0]),
-                                distance.cityblock(n1[1, 1], n2[1])]])
+        [[cityblock(n1[0, 0], n2[0]), cityblock(
+            n1[0, 1], n2[1])], [cityblock(n1[1, 0], n2[0]),
+                                cityblock(n1[1, 1], n2[1])]])
     testing.assert_allclose(expected, out[0], atol=TOLERANCE)
 
   def testL2DistanceWithBroadcast(self):
@@ -185,9 +199,9 @@ class TensorFlowOpTest(unittest.TestCase):
     n2 = numpy.array([[5., 6., 7., -8.], [1., 1., 1., 1.]], dtype=numpy.float32)
     out = self.Run(functions.l2_distance(n1, n2))
     expected = numpy.array(
-        [[distance.euclidean(n1[0, 0], n2[0]), distance.euclidean(
-            n1[0, 1], n2[1])], [distance.euclidean(n1[1, 0], n2[0]),
-                                distance.euclidean(n1[1, 1], n2[1])]])
+        [[euclidean(n1[0, 0], n2[0]), euclidean(
+            n1[0, 1], n2[1])], [euclidean(n1[1, 0], n2[0]),
+                                euclidean(n1[1, 1], n2[1])]])
     testing.assert_allclose(expected, out[0], atol=TOLERANCE)
 
   def testL2DistanceSqWithBroadcast(self):
@@ -197,9 +211,9 @@ class TensorFlowOpTest(unittest.TestCase):
     n2 = numpy.array([[5., 6., 7., -8.], [1., 1., 1., 1.]], dtype=numpy.float32)
     out = self.Run(functions.l2_distance_sq(n1, n2))
     expected = numpy.array(
-        [[distance.euclidean(n1[0, 0], n2[0]), distance.euclidean(
-            n1[0, 1], n2[1])], [distance.euclidean(n1[1, 0], n2[0]),
-                                distance.euclidean(n1[1, 1], n2[1])]])
+        [[euclidean(n1[0, 0], n2[0]), euclidean(
+            n1[0, 1], n2[1])], [euclidean(n1[1, 0], n2[0]),
+                                euclidean(n1[1, 1], n2[1])]])
     expected = numpy.power(expected, 2)
     testing.assert_allclose(expected, out[0], atol=TOLERANCE)
 
@@ -221,9 +235,7 @@ class TensorFlowOpTest(unittest.TestCase):
     out = self.Run(functions.l2_normalize(t1, 1))
     testing.assert_allclose(
         out[0],
-        n1 / numpy.linalg.norm(n1,
-                               2,
-                               axis=1).reshape((2, 1)),
+        n1 / linalg.norm(n1, 2, axis=1).reshape((2, 1)),
         rtol=TOLERANCE)
 
   def testL1Normalize(self):
@@ -232,9 +244,7 @@ class TensorFlowOpTest(unittest.TestCase):
     out = self.Run(functions.l1_normalize(t1, 1))
     testing.assert_allclose(
         out[0],
-        n1 / numpy.linalg.norm(n1,
-                               1,
-                               axis=1).reshape((2, 1)),
+        n1 / linalg.norm(n1, 1, axis=1).reshape((2, 1)),
         rtol=TOLERANCE)
 
   def testLeakyRelu(self):

@@ -170,14 +170,15 @@ class TemplatedPrettyTensorTest(pretty_tensor_testing.PtTestCase):
   def testGraphMatchesImmediate(self):
     """Ensures that the vars line up between the two modes."""
     with tf.Graph().as_default():
-      input_pt = prettytensor.wrap(self.input)
+      input_pt = prettytensor.wrap(
+          tf.constant(self.input_data, dtype=tf.float32))
       self.BuildLargishGraph(input_pt)
       normal_names = sorted([v.name for v in tf.all_variables()])
 
     with tf.Graph().as_default():
       template = prettytensor.template('input')
-      self.BuildLargishGraph(template).construct(
-          input=prettytensor.wrap(self.input))
+      self.BuildLargishGraph(template).construct(input=prettytensor.wrap(
+          tf.constant(self.input_data, dtype=tf.float32)))
       template_names = sorted([v.name for v in tf.all_variables()])
 
     self.assertSequenceEqual(normal_names, template_names)

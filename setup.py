@@ -29,7 +29,6 @@ CONSOLE_SCRIPTS = [
 # pylint: enable=line-too-long
 
 TEST_PACKAGES = [
-    'scipy >= 0.15.1',
     'nose >= 1.3.7',
 ]
 
@@ -52,6 +51,8 @@ setup(
         },
     install_requires=REQUIRED_PACKAGES,
     tests_require=REQUIRED_PACKAGES + TEST_PACKAGES,
+    test_suite = 'nose.collector',
+
     # PyPI package information.
     classifiers=[
         'Development Status :: 4 - Beta',
