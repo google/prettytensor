@@ -67,7 +67,7 @@ Add a summary operation to visualize any tensor.
 
 - - -
 
-## <a name="add_loss"></a>add_loss(loss, name=None, regularization=False)
+## <a name="add_loss"></a>add_loss(loss, name=None, regularization=False, add_summaries=True)
 
 
 
@@ -79,6 +79,7 @@ Append a loss to the total loss for the network.
 * loss: append this loss operation
 * name: The name for this loss, defaults to loss.op.name
 * regularization: Set to True if this is a regularization loss.
+* add_summaries: Set to True if you want to see scalar and average summary.
 
 
 

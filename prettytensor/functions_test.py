@@ -26,16 +26,16 @@ TOLERANCE = 0.000001
 # Distance functions used in tests.  These are defined here instead of using
 # scipy so the open source tests don't depend on such a huge module for 3
 # 1 line functions.
-def cosine(u, v):
-  return 1.0 - numpy.dot(u, v) / (linalg.norm(u) * linalg.norm(v))
+def cosine(u, v):  # pylint: disable=invalid-name
+  return 1.0 - numpy.dot(u, v) / (linalg.norm(u, ord=2) * linalg.norm(v, ord=2))
 
 
-def cityblock(u, v):
+def cityblock(u, v):  # pylint: disable=invalid-name
   return numpy.abs(u - v).sum()
 
 
-def euclidean(u, v):
-  return linalg.norm(u - v)
+def euclidean(u, v):  # pylint: disable=invalid-name
+  return linalg.norm(u - v, ord=2)
 
 
 class TensorFlowOpTest(unittest.TestCase):

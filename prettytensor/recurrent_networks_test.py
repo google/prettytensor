@@ -60,15 +60,14 @@ class RecurrentNetworksTest(pretty_tensor_testing.PtTestCase):
 
   def setUp(self):
     super(self.__class__, self).setUp()
-    self.input_data = numpy.array([
-        [[1.], [2.], [3.], [4.]],
-        [[5.], [6.], [7.], [8.]],
-        [[9.], [10.], [11.], [12.]]],
-                                  dtype=numpy.float)
-    self.sequence = SequenceInputMock(self.bookkeeper,
-                                      self.input_data,
-                                      [[0.], [0.], [1.]],
-                                      13)
+    self.input_data = numpy.array(
+        [
+            [[1.], [2.], [3.], [4.]], [[5.], [6.], [7.], [8.]],
+            [[5.], [6.], [7.], [8.]], [[9.], [10.], [11.], [12.]]
+        ],
+        dtype=numpy.float)
+    self.sequence = SequenceInputMock(self.bookkeeper, self.input_data,
+                                      [[0.], [0.], [0.], [1.]], 13)
 
     self.input, self.output = recurrent_networks.create_sequence_pretty_tensor(
         self.sequence)
@@ -78,7 +77,8 @@ class RecurrentNetworksTest(pretty_tensor_testing.PtTestCase):
     result = self.RunTensor(squashed)
 
     testing.assert_allclose(
-        self.input_data.reshape(12, 1), result,
+        self.input_data.reshape(16, 1),
+        result,
         rtol=TOLERANCE)
 
     result = self.RunTensor(squashed.cleave_sequence())
@@ -111,8 +111,8 @@ class RecurrentNetworksTest(pretty_tensor_testing.PtTestCase):
     result = self.RunTensor(lstm)
 
     self.assertEquals([4, 13], lstm.shape)
-    self.assertEquals(3, len(result))
-    for i in range(3):
+    self.assertEquals(4, len(result))
+    for i in range(4):
       self.assertSequenceEqual(lstm.shape, result[i].shape)
 
   def testArbitraryBatchSizeLstm(self):
@@ -197,7 +197,7 @@ class RecurrentNetworksTest(pretty_tensor_testing.PtTestCase):
 
   def testEmbeddingNameWorkaround(self):
     """Just make sure this runs since it is ensuring that a workaround works."""
-    input_data = self.Wrap(self.input_data.astype(numpy.int32).reshape([12, 1]))
+    input_data = self.Wrap(self.input_data.astype(numpy.int32).reshape([16, 1]))
     result = input_data.embedding_lookup(
         13, [1], name='params')
     self.RunTensor(result)
@@ -233,6 +233,39 @@ class RecurrentNetworksTest(pretty_tensor_testing.PtTestCase):
     self.assertEqual(
         len(self.states), len(self.sequence.requested_tensors),
         'Wrong number of Tensor states.')
+
+  def testLength(self):
+    tf.set_random_seed(4321)
+    with tf.variable_scope('test') as vs:
+      base_lstm = self.input.sequence_lstm(13)
+    lengths = tf.placeholder(dtype=tf.int32, shape=[4])
+
+    # Use the same parameters.
+    with tf.variable_scope(vs, reuse=True):
+      lstm_truncated = self.input.sequence_lstm(13, lengths=lengths)
+
+    with tf.Session() as sess:
+      tf.initialize_all_variables().run()
+
+      result = sess.run(base_lstm.sequence + lstm_truncated.sequence,
+                        {lengths: [10, 4, 1, 1]})
+      base_result = result[:len(base_lstm.sequence)]
+      full_result = result[len(base_lstm.sequence):]
+      truncated_result = sess.run(lstm_truncated.sequence,
+                                  {lengths: [1, 2, 1, 1]})
+
+    for i, (x, y) in enumerate(zip(base_result, truncated_result)):
+      if i < 2:
+        testing.assert_allclose(x, y, rtol=TOLERANCE)
+      else:
+        # After the specified output, we check to make sure the same values are
+        # propagated forward.
+        self.assertFalse(numpy.allclose(x, y, rtol=TOLERANCE))
+        testing.assert_allclose(y, truncated_result[i - 1], rtol=TOLERANCE)
+    for x, y in zip(base_result, full_result):
+      # The later results tend to diverge.  This is something that requires
+      # investigation.
+      testing.assert_allclose(x, y, atol=0.1)
 
 
 if __name__ == '__main__':

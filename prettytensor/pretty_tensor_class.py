@@ -113,7 +113,8 @@ def wrap(tensor, books=None, tensor_shape=None):
     return _DeferredLayer(books, set_input_from_unbound_var, [tensor], {})
   else:
     tensor = tf.convert_to_tensor(tensor, name='input')
-    _set_shape_on_tensor(tensor, tensor_shape)
+    if tensor_shape:
+      _set_shape_on_tensor(tensor, tensor_shape)
     return Layer(books, tensor=tensor, name=tensor.name)
 
 
@@ -597,6 +598,18 @@ class PrettyTensor(object):
     self._bookkeeper = books
 
   @property
+  def layer_parameters(self):
+    """Returns a dict of short-parameter name to model parameter.
+
+    This only tracks direct dependencies (i.e. `Variable`s used to generate this
+    layer.
+
+    Returns:
+      A dict of name to parameters.
+    """
+    raise NotImplementedError('Not implemented')
+
+  @property
   def shape(self):
     return self.get_shape().as_list()
 
@@ -664,11 +677,11 @@ class PrettyTensor(object):
     """
     raise NotImplementedError('Not implemented')
 
-  def with_tensor(self, tensor):
+  def with_tensor(self, tensor, parameters=None):
     """Returns a PrettyTensor that points to tensor."""
     raise NotImplementedError('Not implemented')
 
-  def with_sequence(self, sequence):
+  def with_sequence(self, sequence, parameters=None):
     """Returns a PrettyTensor that points to sequence."""
     raise NotImplementedError('Not implemented')
 
@@ -686,6 +699,9 @@ class PrettyTensor(object):
     """Called after a registered method with the result."""
     if isinstance(result, (PrettyTensor, Loss, PrettyTensorTupleMixin)):
       return result
+    elif (isinstance(result, collections.Sequence) and
+          not isinstance(result, basestring)):
+      return self.with_sequence(result)
     else:
       return self.with_tensor(result)
 
@@ -752,7 +768,7 @@ class PrettyTensor(object):
   def eval(self, feed_dict=None, session=None):
     if self.is_sequence():
       if session is None:
-        session = tf.ops.get_default_session()
+        session = tf.get_default_session()
       return session.run(self.sequence, feed_dict=feed_dict)
     else:
       return self.tensor.eval(feed_dict=feed_dict, session=session)
@@ -928,9 +944,18 @@ class Layer(PrettyTensor):
         or (self._sequence is None == self._tensor is None)):
       raise ValueError('Not completely specified: %s %s %s' %
                        (self.bookkeeper, self._sequence, self._tensor))
+    self._layer_parameters = {}
+
+  @property
+  def layer_parameters(self):
+    return self._layer_parameters
 
   def __str__(self):
     return self._name
+
+  @property
+  def op(self):
+    return self.tensor.op
 
   @property
   def tensor(self):
@@ -951,19 +976,25 @@ class Layer(PrettyTensor):
     return self._sequence is not None
 
   @functools.wraps(PrettyTensor.with_tensor)
-  def with_tensor(self, tensor):
+  def with_tensor(self, tensor, parameters=None):
     # This is very forgiving since there are quite a few types that act like
     # tensors.
     if isinstance(tensor, collections.Sequence):
       raise ValueError('Attempting to use a sequence as a tensor %s.'
                        % (tensor,))
-    return Layer(copy=self, tensor=unwrap(tensor), sequence=None)
+    layer = Layer(copy=self, tensor=unwrap(tensor), sequence=None)
+    if parameters:
+      layer.layer_parameters.update(parameters)
+    return layer
 
   @functools.wraps(PrettyTensor.with_sequence)
-  def with_sequence(self, sequence):
+  def with_sequence(self, sequence, parameters=None):
     if not isinstance(sequence, collections.Sequence):
       raise ValueError('Attempting to use a tensor as a sequence.')
-    return Layer(copy=self, tensor=None, sequence=sequence)
+    layer = Layer(copy=self, tensor=None, sequence=sequence)
+    if parameters:
+      layer.layer_parameters.update(parameters)
+    return layer
 
   def sequential(self):
     """Creates a SequentialLayerBuilder that tracks the most recent tensor."""
@@ -1321,6 +1352,10 @@ class SequentialLayerBuilder(PrettyTensor):
     super(self.__class__, self).__init__(head.bookkeeper)
     self._head = head
 
+  @property
+  def layer_parameters(self):
+    return self._head.layer_parameters
+
   def __str__(self):
     return 'Sequential (head=%s)' % self._head
 
@@ -1345,12 +1380,12 @@ class SequentialLayerBuilder(PrettyTensor):
   def is_sequence(self):
     return self._head.is_sequence()
 
-  def with_tensor(self, tensor):
-    self._head = self._head.with_tensor(tensor)
+  def with_tensor(self, tensor, parameters=None):
+    self._head = self._head.with_tensor(tensor, parameters=parameters)
     return self
 
-  def with_sequence(self, sequence):
-    self._head = self._head.with_sequence(sequence)
+  def with_sequence(self, sequence, parameters=None):
+    self._head = self._head.with_sequence(sequence, parameters=parameters)
     return self
 
   def set_head(self, new_head):
@@ -1447,7 +1482,7 @@ class VarStoreMethod(object):
   """
 
   def __init__(self):
-    self._vars = {}
+    self.vars = {}
 
   def variable(self, var_name, shape, init, dt=tf.float32, train=True):
     """Adds a named variable to this bookkeeper or returns an existing one.
@@ -1472,8 +1507,8 @@ class VarStoreMethod(object):
         and the variable already exists or if the specification of a reused
         variable does not match the original.
     """
-    if var_name in self._vars:
-      v = self._vars[var_name]
+    if var_name in self.vars:
+      v = self.vars[var_name]
       if v.get_shape() != shape:
         raise ValueError(
             'Shape mismatch: %s vs %s. Perhaps a UnboundVariable had '
@@ -1487,7 +1522,7 @@ class VarStoreMethod(object):
                           dtype=dt,
                           initializer=init,
                           trainable=train)
-      self._vars[var_name] = v
+      self.vars[var_name] = v
       return v
 
 
@@ -1826,5 +1861,5 @@ def _conversion_function(pt_wrapper, dtype=None, name=None, as_ref=False):
   return t
 
 
-tf.ops.register_tensor_conversion_function(
+tf.register_tensor_conversion_function(
     (PrettyTensor, Loss), _conversion_function, 100)

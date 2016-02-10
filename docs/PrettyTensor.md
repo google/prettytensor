@@ -374,7 +374,7 @@ A new PrettyTensor.
 
 - - -
 
-## <a name="conv2d"></a>conv2d(kernel, depth, name=None, stride=None, activation_fn=None, l2loss=None, init=None, stddev=None, bias=True, edges=SAME, batch_normalize=False)
+## <a name="conv2d"></a>conv2d(kernel, depth, activation_fn=None, stride=None, l2loss=None, init=None, stddev=None, bias=True, edges=SAME, batch_normalize=False, name=None)
 
 
 
@@ -388,13 +388,11 @@ The current head must be a rank 4 Tensor.
 * kernel: The size of the patch for the pool, either an int or a length 1 or
  2 sequence (if length 1 or int, it is expanded).
 * depth: The depth of the new Tensor.
-* name: The name for this operation is also used to create/find the
- parameter variables.
-* stride: The strides as a length 1, 2 or 4 sequence or an integer. If an
- int, length 1 or 2, the stride in the first and last dimensions are 1.
 * activation_fn: A tuple of (activation_function, extra_parameters). Any
  function that takes a tensor as its first argument can be used. More
  common functions will have summaries added (e.g. relu).
+* stride: The strides as a length 1, 2 or 4 sequence or an integer. If an
+ int, length 1 or 2, the stride in the first and last dimensions are 1.
 * l2loss: Set to a value greater than 0 to use L2 regularization to decay
  the weights.
 * init: An optional initialization. If not specified, uses Xavier
@@ -404,6 +402,8 @@ The current head must be a rank 4 Tensor.
 * edges: Either SAME to use 0s for the out of bounds area or VALID to shrink
  the output size and only uses valid input pixels.
 * batch_normalize: Set to True to batch_normalize this layer.
+* name: The name for this operation is also used to create/find the
+ parameter variables.
 
 #### Returns:
 
@@ -572,6 +572,10 @@ pt.GraphKeys.TEST_VARIABLES and does not add them to
 tf.GraphKeys.ALL_VARIABLES.  This means that you must initialize them
 separately from tf.initialize_all_variables().
 
+In the case of `topk == 1`, this breaks ties left-to-right, in all other cases
+it follows `tf.nn.in_top_k`. *Note*: the tie behavior will change in the
+future.
+
 #### Args:
 
 
@@ -614,7 +618,7 @@ A LayerWrapper with the flattened tensor.
 
 - - -
 
-## <a name="fully_connected"></a>fully_connected(size, name=None, activation_fn=None, l2loss=None, init=None, stddev=None, bias=True, bias_init=0.0)
+## <a name="fully_connected"></a>fully_connected(size, activation_fn=None, l2loss=None, init=None, stddev=None, bias=True, bias_init=0.0, name=None)
 
 
 
@@ -626,8 +630,6 @@ The current head must be a rank 2 Tensor.
 
 
 * size: The number of neurons
-* name: The name for this operation is also used to create/find the
- parameter variables.
 * activation_fn: A tuple of (activation_function, extra_parameters). Any
  function that takes a tensor as its first argument can be used. More
  common functions will have summaries added (e.g. relu).
@@ -638,6 +640,8 @@ The current head must be a rank 2 Tensor.
 * stddev: A standard deviation to use in parameter initialization.
 * bias: Set to False to not have a bias.
 * bias_init: The initial value for the bias.
+* name: The name for this operation is also used to create/find the
+ parameter variables.
 
 #### Returns:
 
@@ -846,27 +850,33 @@ Handle to this layer.
 
 Reshapes this tensor to the given spec.
 
-If a shape description is specified, resolve it as follows:
+A shape_spec can be a list or tuple of numbers specifying the new shape, but
+also may include the following shorthands for using values from the shape of
+the input:
 
-1. DIM_SAME will use the corresponding value from the current shape.
-2. DIM_REST will put all the remaining values in the current shape.
-       Only one DIM_REST is allowed and it must be the last element.
+1. DIM_SAME ('_') will use the corresponding value from the current shape.
+2. One -1 or DIM_REST ('*') can be used to specify the remainder of the
+    values.
 3. An integer will be used as is.
 
 A compact syntax is also supported for setting shapes. If the new shape is
-only composed of DIM_SAME, DIM_REST and single digit integers, then a string
-can be passed in. Integers larger than 9 must be passed in as part of a
+only composed of DIM_SAME, DIM_REST/-1 and single digit integers, then a
+string can be passed in. Integers larger than 9 must be passed in as part of a
 sequence.
 
-Examples (assuming a rank 4 Tensor):
+1. Flatten to a batch dimension (first by convention): [DIM_SAME, -1] or '_*'.
+2. Expand a Rank 2 Tensor so that it can be used as an image: '_11*'.
+The primary difference between this and `tf.reshape` is that `DIM_SAME` allows
+more shape inference possibilities. For example: given a shape of
+**[None, 3, 7]** if flattening were desired then the caller would have to
+compute the shape and request a reshape of **[-1, 21]** to flatten. Instead of
+brittle or repeated code, this can be inferred if we know that the first dim
+is being copied.
 
-1. Collapse to just a batch dimension: [DIM_SAME, 1] or '_1'.
-2. Flatten to a batch dimension: [DIM_SAME, DIM_REST] or '_*'.
-3. Generate a single value along the depth dimension:
-   [DIM_SAME, DIM_SAME, DIM_SAME, 1] or '___1'.
-4. Generate length 11 tensors along the depth:
-   [DIM_SAME, DIM_SAME, DIM_SAME, 11]. The compact syntax is not supported
-   in this case.
+Another example that is impossible to express as a list of integers is if the
+starting shape were **[None, 3, None]** and we wanted to do the same
+flattening. While the shape cannot be inferred, this can still be expressed as
+'_*' (A.K.A. [DIM_SAME, DIM_REST]).
 
 #### Args:
 
@@ -875,20 +885,19 @@ Examples (assuming a rank 4 Tensor):
 
 #### Returns:
 
-A LayerWrapper with the reshaped tensor.
+A Pretty Tensor with the reshaped tensor.
 
 
 #### Raises:
 
 
-* ValueError: If there are two many unknown dimensions or the shape_spec is
- not valid (e.g. requries out of range DIM_SAME or has DIM_REST in an
- illegal spot.)
+* ValueError: If there are two many unknown dimensions or the shape_spec
+* requires out of range DIM_SAME.
 
 
 - - -
 
-## <a name="sequence_gru"></a>sequence_gru(num_units, bias=True, name=None, stddev=None, init=None)
+## <a name="sequence_gru"></a>sequence_gru(num_units, bias=True, name=None, stddev=None, init=None, lengths=None)
 
 
 
@@ -905,6 +914,8 @@ supports state saving, then it is saved.
 * name: The name of this layer.
 * stddev: Standard deviation for Gaussian initialization of parameters.
 * init: A tf.*Initializer that is used to initialize the variables.
+* lengths: An optional Tensor that encodes a length for each item in the
+ minibatch. This is used to truncate computation.
 
 #### Returns:
 
@@ -920,7 +931,7 @@ A sequence with the result at each timestep.
 
 - - -
 
-## <a name="sequence_lstm"></a>sequence_lstm(num_units, bias=True, peephole=True, name=None, stddev=None, init=None)
+## <a name="sequence_lstm"></a>sequence_lstm(num_units, bias=True, peephole=True, name=None, stddev=None, init=None, lengths=None)
 
 
 
@@ -938,6 +949,8 @@ supports state saving, then it is saved.
 * name: The name of this layer.
 * stddev: Standard deviation for Gaussian initialization of parameters.
 * init: A tf.*Initializer that is used to initialize the variables.
+* lengths: An optional Tensor that encodes a length for each item in the
+ minibatch. This is used to truncate computation.
 
 #### Returns:
 
@@ -1260,6 +1273,7 @@ Many Pretty Tensor methods support setting defaults. The supported defaults and 
 
 * `phase`:
     * [batch_normalize](PrettyTensor.md#batch_normalize)
+    * [evaluate_classifier](PrettyTensor.md#evaluate_classifier)
     * [dropout](PrettyTensor.md#dropout)
 
 * `scale_after_normalization`:
@@ -1290,7 +1304,7 @@ Sets the name scope for future operations.
 
 - - -
 
-## <a name="with_sequence"></a>with_sequence(sequence)
+## <a name="with_sequence"></a>with_sequence(sequence, parameters=None)
 
 
 
@@ -1302,7 +1316,7 @@ Returns a PrettyTensor that points to sequence.
 
 - - -
 
-## <a name="with_tensor"></a>with_tensor(tensor)
+## <a name="with_tensor"></a>with_tensor(tensor, parameters=None)
 
 
 

@@ -441,6 +441,7 @@ Many Pretty Tensor methods support setting defaults. The supported defaults and 
 
 * `phase`:
     * [batch_normalize](PrettyTensor.md#batch_normalize)
+    * [evaluate_classifier](PrettyTensor.md#evaluate_classifier)
     * [dropout](PrettyTensor.md#dropout)
 
 * `scale_after_normalization`:

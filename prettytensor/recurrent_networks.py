@@ -15,6 +15,8 @@ import numpy
 
 import tensorflow as tf
 
+from tensorflow.python.ops import control_flow_ops
+
 from prettytensor import bookkeeper
 from prettytensor import pretty_tensor_class as prettytensor
 from prettytensor.pretty_tensor_class import DIM_SAME
@@ -174,7 +176,13 @@ def gru_cell(input_layer, state, num_units, bias=True, stddev=None, init=None):
   return RecurrentResult(new_h, [new_h])
 
 
-def unroll_state_saver(input_layer, name, state_shapes, template):
+def unwrap_all(*args):
+  """Unwraps all of the tensors and returns a list."""
+  result = [prettytensor.unwrap(x) for x in args]
+  return result
+
+
+def unroll_state_saver(input_layer, name, state_shapes, template, lengths=None):
   """Unrolls the given function with state taken from the state saver.
 
   Args:
@@ -183,6 +191,8 @@ def unroll_state_saver(input_layer, name, state_shapes, template):
     state_shapes: A list of shapes, one for each state variable.
     template: A template with unbound variables for input and states that
       returns a RecurrentResult.
+    lengths: The length of each item in the batch.  If provided, use this to
+      truncate computation.
   Returns:
     A sequence from applying the given template to each item in the input
     sequence.
@@ -193,6 +203,10 @@ def unroll_state_saver(input_layer, name, state_shapes, template):
   if isinstance(state_saver, bookkeeper.SimpleStateSaver):
     for state_name, state_shape in zip(state_names, state_shapes):
       state_saver.AddState(state_name, input_layer.dtype, state_shape)
+  if lengths:
+    max_length = tf.reduce_max(lengths)
+  else:
+    max_length = None
 
   results = []
   prev_states = []
@@ -202,19 +216,35 @@ def unroll_state_saver(input_layer, name, state_shapes, template):
     prev_states.append(
         tf.reshape(state_saver.state(state_name), my_shape))
 
+  parameters = None
   for i, layer in enumerate(input_layer.sequence):
     with input_layer.g.name_scope('unroll_%00d' % i):
-      out, prev_states = template(layer, *prev_states)
-    results.append(out.tensor)
+      if i > 0 and max_length:
+        # TODO(eiderman): Right now the everything after length is undefined.
+        # If we can efficiently propagate the last result to the end, then
+        # models with only a final output would require a single softmax
+        # computation.
+        # pylint: disable=cell-var-from-loop
+        result = control_flow_ops.cond(
+            i < max_length,
+            lambda: unwrap_all(*template(layer, *prev_states).flatten()),
+            lambda: unwrap_all(out, *prev_states))
+        out = result[0]
+        prev_states = result[1:]
+      else:
+        out, prev_states = template(layer, *prev_states)
+    if parameters is None:
+      parameters = out.layer_parameters
+    results.append(prettytensor.unwrap(out))
 
-  updates = [state_saver.save_state(state_name, prev_state.tensor)
+  updates = [state_saver.save_state(state_name, prettytensor.unwrap(prev_state))
              for state_name, prev_state in zip(state_names, prev_states)]
 
   # Set it up so that update is evaluated when the result of this method is
   # evaluated by injecting a dependency on an arbitrary result.
   with tf.control_dependencies(updates):
     results[0] = tf.identity(results[0])
-  return input_layer.with_sequence(results)
+  return input_layer.with_sequence(results, parameters=parameters)
 
 
 # pylint: disable=invalid-name
@@ -237,7 +267,8 @@ class sequence_lstm(prettytensor.VarStoreMethod):
                peephole=True,
                name=PROVIDED,
                stddev=None,
-               init=None):
+               init=None,
+               lengths=None):
     """Creates an unrolled LSTM to process sequence data.
 
     The initial state is drawn from the bookkeeper's recurrent state and if it
@@ -251,6 +282,8 @@ class sequence_lstm(prettytensor.VarStoreMethod):
       name: The name of this layer.
       stddev: Standard deviation for Gaussian initialization of parameters.
       init: A tf.*Initializer that is used to initialize the variables.
+      lengths: An optional Tensor that encodes a length for each item in the
+        minibatch. This is used to truncate computation.
     Returns:
       A sequence with the result at each timestep.
     Raises:
@@ -272,7 +305,8 @@ class sequence_lstm(prettytensor.VarStoreMethod):
     batch_size = input_layer.shape[0]
     state_shapes = [[batch_size, num_units],
                     [batch_size, num_units]]
-    return unroll_state_saver(input_layer, name, state_shapes, self.template)
+    return unroll_state_saver(input_layer, name, state_shapes, self.template,
+                              lengths)
 
 
 # pylint: disable=invalid-name
@@ -294,7 +328,8 @@ class sequence_gru(prettytensor.VarStoreMethod):
                bias=True,
                name=PROVIDED,
                stddev=None,
-               init=None):
+               init=None,
+               lengths=None):
     """Creates an unrolled GRU to process sequence data.
 
     The initial state is drawn from the bookkeeper's recurrent state and if it
@@ -307,6 +342,8 @@ class sequence_gru(prettytensor.VarStoreMethod):
       name: The name of this layer.
       stddev: Standard deviation for Gaussian initialization of parameters.
       init: A tf.*Initializer that is used to initialize the variables.
+      lengths: An optional Tensor that encodes a length for each item in the
+        minibatch. This is used to truncate computation.
     Returns:
       A sequence with the result at each timestep.
     Raises:
@@ -324,7 +361,7 @@ class sequence_gru(prettytensor.VarStoreMethod):
 
     batch_size = input_layer.shape[0]
     return unroll_state_saver(input_layer, name, [(batch_size, num_units)],
-                              self.template)
+                              self.template, lengths)
 
 
 @prettytensor.Register
@@ -453,7 +490,8 @@ class embedding_lookup(prettytensor.VarStoreMethod):
 
     name = 'params_1' if name == 'params' else name
     return input_layer.with_tensor(
-        tf.nn.embedding_lookup(embeddings, head, name=name))
+        tf.nn.embedding_lookup(embeddings, head, name=name),
+        parameters=self.vars)
 
 
 # TODO(eiderman): It would be nice to have a mechanism where a network could

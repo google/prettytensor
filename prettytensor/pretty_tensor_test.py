@@ -20,10 +20,10 @@ from numpy import testing
 import tensorflow as tf
 
 import prettytensor
-from prettytensor import DIM_REST
 from prettytensor import DIM_SAME
 from prettytensor import Phase
 from prettytensor import pretty_tensor_class
+from prettytensor import pretty_tensor_methods
 from prettytensor import pretty_tensor_testing
 
 
@@ -124,15 +124,26 @@ class PrettyTensorTest(pretty_tensor_testing.PtTestCase):
       self.input_layer.reshape([DIM_SAME, DIM_SAME, DIM_SAME, DIM_SAME])
 
   def testShapeSpecWithPlaceHoldersRest(self):
-    reshaped = self.input_layer.reshape([DIM_SAME, DIM_REST])
+    reshaped = self.input_layer.reshape([DIM_SAME, -1])
     self.assertEqual([2, 15], reshaped.shape)
 
     out = self.RunTensor(reshaped)
     self.assertEqual((2, 15), out.shape)
 
-  def testShapeSpecWithPlaceHoldersRestWrongPlace(self):
+  def testShapeSpecWithPlaceHoldersRestInMiddle(self):
+    reshaped = self.input_layer.reshape([DIM_SAME, -1, 1])
+    self.assertEqual([2, 15, 1], reshaped.shape)
+
+    out = self.RunTensor(reshaped)
+    self.assertEqual((2, 15, 1), out.shape)
+
+  def testDimRestErrors(self):
     with self.assertRaises(ValueError):
-      self.input_layer.reshape([DIM_SAME, DIM_REST, 1])
+      pretty_tensor_methods._infer_unknown_dims([2, 3, 5], [DIM_SAME, -1, 2])
+    with self.assertRaises(ValueError):
+      pretty_tensor_methods._infer_unknown_dims([2, 3, 5], [DIM_SAME, -1, -1])
+    with self.assertRaises(ValueError):
+      pretty_tensor_methods._infer_unknown_dims([2, 3, 5], [DIM_SAME, 14])
 
   def testShapeSpecWithPlaceHoldersCompact(self):
     reshaped = self.input_layer.reshape('__5')
@@ -230,6 +241,8 @@ class PrettyTensorTest(pretty_tensor_testing.PtTestCase):
     st.conv2d(3, 2)
     result = self.RunTensor(st)
     self.assertEqual(2, result.shape[-1])
+    self.assertTrue(st.layer_parameters['weights'])
+    self.assertTrue(st.layer_parameters['bias'])
 
   def testConvBatchNorm(self):
     st = self.input_layer.sequential()
@@ -256,6 +269,8 @@ class PrettyTensorTest(pretty_tensor_testing.PtTestCase):
     st.fully_connected(20)
     result = self.RunTensor(st)
     self.assertEqual(20, result.shape[1])
+    self.assertTrue(st.layer_parameters['weights'])
+    self.assertTrue(st.layer_parameters['bias'])
 
   def testFullWithVariableStart(self):
     input_layer = prettytensor.wrap(tf.Variable(self.input_data))
@@ -438,33 +453,26 @@ class PrettyTensorTest(pretty_tensor_testing.PtTestCase):
       flat.fully_connected(100)
 
   def testReshapeWithOneUnknownDim(self):
-    shape = list(self.input_data.shape)
-    shape[0] = None
-    input_data = tf.placeholder(tf.float32, shape)
+    shape = pretty_tensor_methods._infer_unknown_dims([2, 3, None], '_*')
+    self.assertEquals([2, -1], shape)
 
-    nn = self.Wrap(input_data).flatten().fully_connected(
-        100).fully_connected(200)
-    self.assertEquals([None, 200], nn.shape)
+  def testReshapeWithUnknownBatch(self):
+    shape = pretty_tensor_methods._infer_unknown_dims([None, 3, 5], '_*')
+    self.assertEquals(['_', 15], shape)
 
   def testReshapeWithTwoLegalUnknownDim(self):
-    # Legal because the unknown dimensions are multiplied.
-    shape = list(self.input_data.shape)
-    shape[1] = None
-    shape[2] = None
-    input_data = tf.placeholder(tf.float32, shape)
+    shape = pretty_tensor_methods._infer_unknown_dims([2, None, None], '_*')
+    self.assertEquals([2, -1], shape)
 
-    nn = self.Wrap(input_data).reshape('_*')
-    self.assertEquals([shape[0], None], nn.shape)
+  def testReshapeWithTensor(self):
+    shape = tf.constant([2, 5]) * tf.constant(1, 3)
+
+    reshaped = self.Wrap(self.input).reshape(shape)
+    self.assertEquals([None, None], reshaped.shape)
 
   def testReshapeWithTooManyUnknownDim(self):
-    # Legal because the unknown dimensions are multiplied.
-    shape = list(self.input_data.shape)
-    shape[0] = None
-    shape[2] = None
-    input_data = tf.placeholder(tf.float32, shape)
-
-    with self.assertRaises(ValueError):
-      self.Wrap(input_data).reshape('_*')
+    shape = pretty_tensor_methods._infer_unknown_dims([None, 3, None], '_*')
+    self.assertEquals(['_', -1], shape)
 
   def testSoftmaxEval(self):
     np_prediction = numpy.array([
@@ -498,6 +506,24 @@ class PrettyTensorTest(pretty_tensor_testing.PtTestCase):
         tf.constant(actual), tf.constant(weights))
     result = self.RunTensor(evaluation)
     testing.assert_allclose(numpy.array([2. / 3.]), result, rtol=TOLERANCE)
+
+  def testEvaluatorCreatesUniqueVariables(self):
+    actual = numpy.array([
+        [0, 1, 0],
+        [1, 0, 0],
+    ], dtype=numpy.float)
+    with tf.variable_scope('scope') as vs:
+      (self.input_layer
+       .flatten()
+       .softmax_classifier(3))
+    with tf.variable_scope(vs, reuse=True):
+      # We would have an exception if evaluate_classifier used get_variable to
+      # create a new variable. The first example doesn't add
+      # evaluate_classifier.
+      (self.input_layer
+       .flatten()
+       .softmax_classifier(3).softmax
+       .evaluate_classifier(actual, phase=prettytensor.Phase.test))
 
   def testWeightedSoftmaxEval(self):
     np_prediction = numpy.array(
@@ -567,6 +593,34 @@ class PrettyTensorTest(pretty_tensor_testing.PtTestCase):
     evaluation = prediction.evaluate_classifier(tf.constant(actual), topk=2)
     result = self.RunTensor(evaluation)
     testing.assert_allclose(numpy.array([0.8]), result, rtol=TOLERANCE)
+
+    # TopK@3
+    evaluation = prediction.evaluate_classifier(tf.constant(actual), topk=3)
+    result = self.RunTensor(evaluation)
+    testing.assert_allclose(numpy.array([1.0]), result, rtol=TOLERANCE)
+
+  def testSoftmaxEvalAtTopKWithTie(self):
+    np_prediction = numpy.zeros((5, 3), dtype=numpy.float)
+    actual = numpy.array([
+        [0, 1, 0],
+        [1, 0, 0],
+        [1, 0, 0],
+        [0, 0, 1],
+        [0, 1, 0],
+    ], dtype=numpy.float)
+    prediction = self.Wrap(np_prediction)
+    # Note: none of these are ideal. k=1 goes left-to-right and 1.0 is just
+    # plain wrong for k>1
+
+    # TopK@1
+    evaluation = prediction.evaluate_classifier(tf.constant(actual), topk=1)
+    result = self.RunTensor(evaluation)
+    testing.assert_allclose(numpy.array([0.4]), result, rtol=TOLERANCE)
+
+    # TopK@2
+    evaluation = prediction.evaluate_classifier(tf.constant(actual), topk=2)
+    result = self.RunTensor(evaluation)
+    testing.assert_allclose(numpy.array([1.0]), result, rtol=TOLERANCE)
 
     # TopK@3
     evaluation = prediction.evaluate_classifier(tf.constant(actual), topk=3)

@@ -106,7 +106,7 @@ class Runner(object):
 
   def _log_and_save(self, sess, results):
     step = results[0]
-    to_print = [x for x in results[1:] if x]
+    to_print = [x for x in results[1:] if x is not None]
     print '[%d] %s' % (step, to_print)
     if self._save_path:
       self._saver.save(sess, self._save_path, step)

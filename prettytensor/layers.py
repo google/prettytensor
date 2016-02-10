@@ -63,7 +63,6 @@ def apply_activation(
                       functions.l1_normalize):
     books.add_scalar_summary(tf.reduce_mean(tf.sqrt(tf.sum(tf.square(x), 1))),
                              '%s/length' % y.op.name)
-  books.add_histogram_summary(y, '%s/activations' % y.op.name)
   return y
 
 
@@ -71,7 +70,7 @@ def add_l2loss(books, params, l2loss, name='weight_decay'):
   if l2loss:
     books.add_loss(
         tf.mul(tf.nn.l2_loss(params), l2loss, name=name),
-        regularization=True)
+        regularization=True, add_summaries=False)
 
 
 def xavier_init(n_inputs, n_outputs, uniform=True):

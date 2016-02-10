@@ -22,76 +22,154 @@ from prettytensor.pretty_tensor_class import Phase
 from prettytensor.pretty_tensor_class import PROVIDED
 
 
+def _infer_unknown_dims(old_shape, shape_spec):
+  """Attempts to replace DIM_REST (if present) with a value.
+
+  Because of DIM_SAME, this has more information to compute a shape value than
+  the default reshape's shape function.
+
+  Args:
+    old_shape: The current shape of the Tensor as a list.
+    shape_spec: A shape spec, see `pt.reshape`.
+  Returns:
+    A list derived from `shape_spec` with `DIM_SAME` replaced by the value from
+    old_shape (if possible) and `DIM_REST` computed (if possible).
+  Raises:
+    ValueError: If there are two many unknown dimensions or the shape_spec
+    requires out of range DIM_SAME.
+    TypeError: If shape_spec if not iterable.
+  """
+
+  # To compute the dimension of an unknown, we need to track which of the values
+  # from old_shape are not copied for the numerator and any values specified as
+  # integers for the denominator.
+  #
+  # After the loop, if any input dimension is unknown and not DIM_SAME, the
+  # numerator will be 0. Otherwise it is the product of all non-DIM_SAME
+  # dimensions.  This means that the dimension of DIM_REST is
+  # numerator / denominator
+  numerator_elements = [x if x else 0 for x in old_shape]
+  denominator = 1
+  unknowns = 0
+
+  result = []
+  for i, s in enumerate(shape_spec):
+    if s == DIM_SAME:
+      if i >= len(old_shape):
+        raise ValueError('%d exceeds the input shape' % i)
+      if old_shape[i] is None:
+        result.append(DIM_SAME)
+      else:
+        result.append(old_shape[i])
+      numerator_elements[i] = 1
+    elif s in (DIM_REST, -1, None):
+      result.append(-1)
+      unknowns += 1
+    else:
+      x = int(s)
+      result.append(x)
+      denominator *= x
+
+  numerator = 1
+  for x in numerator_elements:
+    numerator *= x
+  if unknowns > 1:
+    raise ValueError('Only one unknown value (-1 or *) is allowed: %s' %
+                     shape_spec)
+  elif numerator % denominator != 0:
+    raise ValueError('Input (%s) cannot be reshaped to %s.' %
+                     (old_shape, shape_spec))
+  elif unknowns == 0 and numerator > 0 and numerator != denominator:
+    raise ValueError('Input (%s) cannot be reshaped to %s.' %
+                     (old_shape, shape_spec))
+  if numerator and unknowns:
+    unknown_elements = numerator / denominator
+    return [unknown_elements if x == -1 else x for x in result]
+  else:
+    return result
+
+
 @prettytensor.Register
 def reshape(input_layer, shape_spec):
   """Reshapes this tensor to the given spec.
 
-  If a shape description is specified, resolve it as follows:
+  A shape_spec can be a list or tuple of numbers specifying the new shape, but
+  also may include the following shorthands for using values from the shape of
+  the input:
 
-  1. DIM_SAME will use the corresponding value from the current shape.
-  2. DIM_REST will put all the remaining values in the current shape.
-         Only one DIM_REST is allowed and it must be the last element.
+  1. DIM_SAME ('_') will use the corresponding value from the current shape.
+  2. One -1 or DIM_REST ('*') can be used to specify the remainder of the
+      values.
   3. An integer will be used as is.
 
   A compact syntax is also supported for setting shapes. If the new shape is
-  only composed of DIM_SAME, DIM_REST and single digit integers, then a string
-  can be passed in. Integers larger than 9 must be passed in as part of a
+  only composed of DIM_SAME, DIM_REST/-1 and single digit integers, then a
+  string can be passed in. Integers larger than 9 must be passed in as part of a
   sequence.
 
-  Examples (assuming a rank 4 Tensor):
+  1. Flatten to a batch dimension (first by convention): [DIM_SAME, -1] or '_*'.
+  2. Expand a Rank 2 Tensor so that it can be used as an image: '_11*'.
+  The primary difference between this and `tf.reshape` is that `DIM_SAME` allows
+  more shape inference possibilities. For example: given a shape of
+  **[None, 3, 7]** if flattening were desired then the caller would have to
+  compute the shape and request a reshape of **[-1, 21]** to flatten. Instead of
+  brittle or repeated code, this can be inferred if we know that the first dim
+  is being copied.
 
-  1. Collapse to just a batch dimension: [DIM_SAME, 1] or '_1'.
-  2. Flatten to a batch dimension: [DIM_SAME, DIM_REST] or '_*'.
-  3. Generate a single value along the depth dimension:
-     [DIM_SAME, DIM_SAME, DIM_SAME, 1] or '___1'.
-  4. Generate length 11 tensors along the depth:
-     [DIM_SAME, DIM_SAME, DIM_SAME, 11]. The compact syntax is not supported
-     in this case.
+  Another example that is impossible to express as a list of integers is if the
+  starting shape were **[None, 3, None]** and we wanted to do the same
+  flattening. While the shape cannot be inferred, this can still be expressed as
+  '_*' (A.K.A. [DIM_SAME, DIM_REST]).
 
   Args:
     input_layer: The Pretty Tensor object, supplied.
     shape_spec: The spec for the new shape.
   Returns:
-    A LayerWrapper with the reshaped tensor.
+    A Pretty Tensor with the reshaped tensor.
   Raises:
-    ValueError: If there are two many unknown dimensions or the shape_spec is
-      not valid (e.g. requries out of range DIM_SAME or has DIM_REST in an
-      illegal spot.)
+    ValueError: If there are two many unknown dimensions or the shape_spec
+    requires out of range DIM_SAME.
   """
-  unknowns = 0
-  old_shape = input_layer.shape
-  new_shape = []
-  for i in range(len(shape_spec)):
-    s = shape_spec[i]
-    if s == DIM_SAME:
-      if i >= len(old_shape):
-        raise ValueError('%d exceeds the head_shape' % i)
-      if old_shape[i] is None:
-        new_shape.append(-1)
-        unknowns += 1
-      else:
-        new_shape.append(old_shape[i])
-    elif s == DIM_REST:
-      if i != len(shape_spec) - 1:
-        raise ValueError('DIM_REST must be at the end.')
-      size = 1
-      for j in range(i, len(old_shape)):
-        if old_shape[j] is not None:
-          size *= old_shape[j]
-        else:
-          size = -1
-          unknowns += 1
-          break
-      new_shape.append(size)
-    elif s is None or s == -1:
-      new_shape.append(-1)
-      unknowns += 1
-    else:
-      new_shape.append(int(s))
+  old_shape = input_layer.get_shape().as_list()
 
-  if unknowns > 1:
-    raise ValueError('Invalid shape, too many unknowns: %s' % new_shape)
-  return input_layer.with_tensor(tf.reshape(input_layer, new_shape))
+  # Extract both a tensor that sets the new shape and as much of the new
+  # shape is known. This lets us merge in any extra information we have about
+  # the shape.
+  try:
+    new_shape = _infer_unknown_dims(old_shape, shape_spec)
+  except TypeError:
+    # shape_spec is not iterable, it is probably a tensor or variable.
+    return tf.reshape(input_layer, shape_spec)
+  reshape_tensor = []
+
+  # To avoid bloating the graph, we want to capture consecutive integers into
+  # a single tf.constant. This allows us to eliminate tf.concat when we know the
+  # shape.
+  runner = []
+
+  for i, s in enumerate(new_shape):
+    if s is DIM_SAME:
+      new_shape[i] = None
+      if runner:
+        reshape_tensor.append(tf.constant(runner))
+        runner = []
+      # Since we can't statically infer the value, compute it from the graph.
+      reshape_tensor.append(tf.gather(tf.shape(input_layer), [i]))
+    else:
+      runner.append(s)
+      if s == -1:
+        new_shape[i] = None
+  if runner:
+    reshape_tensor.append(tf.constant(runner))
+
+  if len(reshape_tensor) == 1:
+    reshape_tensor = reshape_tensor[0]
+  else:
+    reshape_tensor = tf.concat(0, reshape_tensor)
+  result = tf.reshape(input_layer, reshape_tensor)
+  result.set_shape(new_shape)
+
+  return input_layer.with_tensor(result)
 
 
 @prettytensor.Register
@@ -108,9 +186,9 @@ def flatten(input_layer, preserve_batch=True):
     A LayerWrapper with the flattened tensor.
   """
   if preserve_batch:
-    return reshape(input_layer, [DIM_SAME, DIM_REST])
+    return reshape(input_layer, [DIM_SAME, -1])
   else:
-    return reshape(input_layer, [DIM_REST])
+    return reshape(input_layer, [-1])
 
 
 @prettytensor.Register
@@ -174,7 +252,7 @@ class diagonal_matrix_mul(prettytensor.VarStoreMethod):
     param = self.variable('weights', [size], init)
     layers.add_l2loss(input_layer.bookkeeper, param, l2loss)
 
-    return input_layer * param
+    return input_layer.with_tensor(input_layer * param, parameters=self.vars)
 # pylint: enable=invalid-name
 
 
@@ -185,13 +263,13 @@ class fully_connected(prettytensor.VarStoreMethod):
   def __call__(self,
                input_layer,
                size,
-               name=PROVIDED,
                activation_fn=None,
                l2loss=None,
                init=None,
                stddev=None,
                bias=True,
-               bias_init=0.):
+               bias_init=0.,
+               name=PROVIDED):
     """Adds the parameters for a fully connected layer and returns a tensor.
 
     The current head must be a rank 2 Tensor.
@@ -199,8 +277,6 @@ class fully_connected(prettytensor.VarStoreMethod):
     Args:
       input_layer: The Pretty Tensor object, supplied.
       size: The number of neurons
-      name: The name for this operation is also used to create/find the
-        parameter variables.
       activation_fn: A tuple of (activation_function, extra_parameters). Any
         function that takes a tensor as its first argument can be used. More
         common functions will have summaries added (e.g. relu).
@@ -211,6 +287,8 @@ class fully_connected(prettytensor.VarStoreMethod):
       stddev: A standard deviation to use in parameter initialization.
       bias: Set to False to not have a bias.
       bias_init: The initial value for the bias.
+      name: The name for this operation is also used to create/find the
+        parameter variables.
     Returns:
       A Pretty Tensor handle to the layer.
     Raises:
@@ -252,13 +330,13 @@ class fully_connected(prettytensor.VarStoreMethod):
     if activation_fn is not None:
       if not isinstance(activation_fn, collections.Sequence):
         activation_fn = (activation_fn,)
-      return layers.apply_activation(
+      y = layers.apply_activation(
           books,
           y,
           activation_fn[0],
           activation_args=activation_fn[1:])
-    else:
-      return y
+    books.add_histogram_summary(y, '%s/activations' % y.op.name)
+    return input_layer.with_tensor(y, parameters=self.vars)
 # pylint: enable=invalid-name
 
 

@@ -38,7 +38,7 @@ class LocalTrainerTest(unittest.TestCase):
 
   def setUp(self):
     self.prng = numpy.random.RandomState(42)
-    tf.ops.reset_default_graph()
+    tf.reset_default_graph()
     self.input = tf.placeholder(tf.float32, [4, 2])
     self.target = tf.placeholder(tf.float32)
     xor_inputs = numpy.array([[0., 0.], [1., 0.], [1., 1.], [0., 1.]])

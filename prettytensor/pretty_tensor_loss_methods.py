@@ -261,7 +261,7 @@ def softmax(input_layer,
     return SoftmaxResult(input_layer.softmax_activation(), None)
 
 
-@prettytensor.Register
+@prettytensor.Register(assign_defaults=('phase',))
 def evaluate_classifier(input_layer, labels, per_example_weights=None,
                         topk=1, name=PROVIDED, phase=Phase.train):
   """Calculates the total ratio of correct predictions across all examples seen.
@@ -270,6 +270,10 @@ def evaluate_classifier(input_layer, labels, per_example_weights=None,
   pt.GraphKeys.TEST_VARIABLES and does not add them to
   tf.GraphKeys.ALL_VARIABLES.  This means that you must initialize them
   separately from tf.initialize_all_variables().
+
+  In the case of `topk == 1`, this breaks ties left-to-right, in all other cases
+  it follows `tf.nn.in_top_k`. *Note*: the tie behavior will change in the
+  future.
 
   Args:
     input_layer: The input_layer.
@@ -286,14 +290,15 @@ def evaluate_classifier(input_layer, labels, per_example_weights=None,
       input_layer, labels, per_example_weights, topk=topk)
   if phase != Phase.train:
     dtype = tf.float32
-    # Create the variables in all cases so that the load logic is easier.
-    count = tf.get_variable('count_%d' % topk, [], dtype, tf.zeros_initializer,
-                            collections=[bookkeeper.GraphKeys.TEST_VARIABLES],
-                            trainable=False)
-    correct = tf.get_variable('correct_%d' % topk, [], dtype,
-                              tf.zeros_initializer,
-                              collections=[bookkeeper.GraphKeys.TEST_VARIABLES],
-                              trainable=False)
+    # Create the variables using tf.Variable because we don't want to share.
+    count = tf.Variable(tf.constant(0, dtype=dtype),
+                        name='count_%d' % topk,
+                        collections=[bookkeeper.GraphKeys.TEST_VARIABLES],
+                        trainable=False)
+    correct = tf.Variable(tf.constant(0, dtype=dtype),
+                          name='correct_%d' % topk,
+                          collections=[bookkeeper.GraphKeys.TEST_VARIABLES],
+                          trainable=False)
     with input_layer.g.device(count.device):
       examples = tf.assign_add(count, examples)
     with input_layer.g.device(correct.device):
@@ -305,9 +310,14 @@ def evaluate_classifier(input_layer, labels, per_example_weights=None,
 def _compute_average_correct(input_layer, labels, per_example_weights, topk=1):
   """Returns the numerator and denominator of classifier accuracy."""
   dtype = tf.float32
-  _, true_labels = tf.nn.top_k(labels, k=1)
-  true_labels = tf.reshape(true_labels, [-1])
-  in_topk = tf.nn.in_top_k(tf.cast(input_layer, dtype), true_labels, k=topk)
+  if topk == 1:
+    true_labels = tf.argmax(input_layer, 1)
+    predictions = tf.argmax(labels, 1)
+    in_topk = tf.equal(true_labels, predictions)
+  else:
+    _, true_labels = tf.nn.top_k(labels, k=1)
+    true_labels = tf.reshape(true_labels, [-1])
+    in_topk = tf.nn.in_top_k(tf.cast(input_layer, dtype), true_labels, k=topk)
   correct_predictions = tf.cast(in_topk, dtype)
 
   # If individual examples are weighted, then we want to normalize by that.

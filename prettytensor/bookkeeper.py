@@ -128,9 +128,10 @@ class Bookkeeper(object):
       raise ValueError('Global step must be an int32 or int64 variable: %s' %
                        global_step.dtype)
     self._global_step = global_step
+
     if default_device:
       # pylint: disable=protected-access
-      self.g._push_default_device_function(default_device)
+      self.g._device_function_stack.append(default_device)
 
     self._recurrent_state = None
 
@@ -266,23 +267,25 @@ class Bookkeeper(object):
     Raises:
       ValueError: if decay is not in [0, 1).
     """
-    with self.g.as_default():
+    with self._g.as_default():
       if decay < 0 or decay >= 1.0:
         raise ValueError('Decay is %5.2f, but has to be in [0, 1).' % decay)
       if not avg_var:
-        shape = var.get_shape()
         avg_name = '%s_average' % _bare_var_name(var)
-        avg_var = tf.Variable(
-            tf.zeros_initializer(shape=shape, dtype=var.dtype),
-            name=avg_name,
-            trainable=False)
+        with tf.control_dependencies(None):
+          with tf.name_scope(avg_name + '/Initializer/'):
+            init_val = tf.constant(0, dtype=var.dtype.base_dtype)
+          avg_var = tf.Variable(init_val, name=avg_name, trainable=False)
+
       num_updates = tf.cast(self.global_step, tf.float32)
       decay = tf.maximum(
           0.9, tf.minimum(decay, (1.0 + num_updates) / (10.0 + num_updates)))
       with tf.device(avg_var.device):
         if ignore_nan:
           var = tf.select(tf.is_finite(var), var, avg_var)
-        avg_update = tf.assign_sub(avg_var, (1 - decay) * (avg_var - var))
+        avg_update = tf.assign(
+            avg_var, avg_var - (1 - decay) * (avg_var - var),
+            validate_shape=False)
       self._g.add_to_collection(GraphKeys.UPDATE_OPS, avg_update)
       return avg_var
 
@@ -322,13 +325,14 @@ class Bookkeeper(object):
     for loss in losses:
       self.add_loss(loss, regularization=regularization)
 
-  def add_loss(self, loss, name=None, regularization=False):
+  def add_loss(self, loss, name=None, regularization=False, add_summaries=True):
     """Append a loss to the total loss for the network.
 
     Args:
       loss: append this loss operation
       name: The name for this loss, defaults to loss.op.name
       regularization: Set to True if this is a regularization loss.
+      add_summaries: Set to True if you want to see scalar and average summary.
     """
     # TODO(eiderman): Strip name out and just rely on the name scope.
     _ = name   # Eliminates pylint warning.
@@ -336,8 +340,9 @@ class Bookkeeper(object):
       self._g.add_to_collection(GraphKeys.REGULARIZATION_LOSSES, loss)
 
     tf.add_to_collection(GraphKeys.LOSSES, loss)
-    self.add_scalar_summary(loss, 'loss')
-    self.add_average_summary(loss, 'loss_average')
+    if add_summaries:
+      self.add_scalar_summary(loss, 'loss')
+      self.add_average_summary(loss, 'loss_average')
 
   def create_composite_loss(
       self, losses, regularize=True, include_marked=True, name='cost'):
@@ -434,9 +439,9 @@ class SimpleStateSaver(object):
       state_shape[0] = 1
       # For the TensorShapeProto, we need to use "0" to indicate the batch
       # size can be set at runtime - "None" cannot be stored in the proto.
-      shape_proto = tf.tensor_util.MakeTensorShapeProto([0] + state_shape[1:])
+      shape_proto = tf.TensorShape([0] + state_shape[1:]).as_proto()
     else:
-      shape_proto = tf.tensor_util.MakeTensorShapeProto(state_shape)
+      shape_proto = tf.TensorShape(state_shape).as_proto()
 
     # Add a constant tensor of zeros. At training time, this will initialize
     # the state with 0 - at inference time, this node is replaced by a feed.

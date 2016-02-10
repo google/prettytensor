@@ -10,6 +10,7 @@
 # limitations under the License.
 """Image methods for PrettyTensor."""
 import collections
+import numbers
 
 import tensorflow as tf
 
@@ -160,15 +161,15 @@ class conv2d(prettytensor.VarStoreMethod):
                input_layer,
                kernel,
                depth,
-               name=PROVIDED,
-               stride=None,
                activation_fn=None,
+               stride=None,
                l2loss=None,
                init=None,
                stddev=None,
                bias=True,
                edges=PAD_SAME,
-               batch_normalize=False):
+               batch_normalize=False,
+               name=PROVIDED):
     """Adds a convolution to the stack of operations.
 
     The current head must be a rank 4 Tensor.
@@ -178,13 +179,11 @@ class conv2d(prettytensor.VarStoreMethod):
       kernel: The size of the patch for the pool, either an int or a length 1 or
         2 sequence (if length 1 or int, it is expanded).
       depth: The depth of the new Tensor.
-      name: The name for this operation is also used to create/find the
-        parameter variables.
-      stride: The strides as a length 1, 2 or 4 sequence or an integer. If an
-        int, length 1 or 2, the stride in the first and last dimensions are 1.
       activation_fn: A tuple of (activation_function, extra_parameters). Any
         function that takes a tensor as its first argument can be used. More
         common functions will have summaries added (e.g. relu).
+      stride: The strides as a length 1, 2 or 4 sequence or an integer. If an
+        int, length 1 or 2, the stride in the first and last dimensions are 1.
       l2loss: Set to a value greater than 0 to use L2 regularization to decay
         the weights.
       init: An optional initialization. If not specified, uses Xavier
@@ -194,6 +193,8 @@ class conv2d(prettytensor.VarStoreMethod):
       edges: Either SAME to use 0s for the out of bounds area or VALID to shrink
         the output size and only uses valid input pixels.
       batch_normalize: Set to True to batch_normalize this layer.
+      name: The name for this operation is also used to create/find the
+        parameter variables.
     Returns:
       Handle to the generated layer.
     Raises:
@@ -243,7 +244,8 @@ class conv2d(prettytensor.VarStoreMethod):
           y,
           activation_fn[0],
           activation_args=activation_fn[1:])
-    return input_layer.with_tensor(y)
+    books.add_histogram_summary(y, '%s/activations' % y.op.name)
+    return input_layer.with_tensor(y, parameters=self.vars)
 # pylint: enable=redefined-outer-name,invalid-name
 
 # Helper methods
@@ -258,7 +260,7 @@ def _kernel(kernel_spec):
   Returns:
     A length 2 list.
   """
-  if isinstance(kernel_spec, (int, long)):
+  if isinstance(kernel_spec, numbers.Integral):
     return [kernel_spec, kernel_spec]
   elif len(kernel_spec) == 1:
     return [kernel_spec[0], kernel_spec[0]]
@@ -271,13 +273,14 @@ def _stride(stride_spec):
   """Expands the stride spec into a length 4 list.
 
   Args:
-    stride_spec: None, an integer or a length 1, 2, or 4 sequence.
+    stride_spec: If length 0, 1 or 2 then assign the inner dimensions, otherwise
+      return stride_spec if it is length 4.
   Returns:
     A length 4 list.
   """
   if stride_spec is None:
     return [1, 1, 1, 1]
-  elif isinstance(stride_spec, (int, long)):
+  elif isinstance(stride_spec, numbers.Integral):
     return [1, stride_spec, stride_spec, 1]
   elif len(stride_spec) == 1:
     return [1, stride_spec[0], stride_spec[0], 1]
