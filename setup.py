@@ -13,10 +13,11 @@ import fnmatch
 import os
 from setuptools import find_packages, setup, Extension
 
-_VERSION = '0.5.1'
+_VERSION = '0.5.2'
 
 REQUIRED_PACKAGES = [
     'enum34 >= 1.0.0',
+    'six >= 1.10.0',
     'tensorflow >= 0.5.0',
 ]
 
@@ -52,7 +53,6 @@ setup(
     install_requires=REQUIRED_PACKAGES,
     tests_require=REQUIRED_PACKAGES + TEST_PACKAGES,
     test_suite = 'nose.collector',
-
     # PyPI package information.
     classifiers=[
         'Development Status :: 4 - Beta',
