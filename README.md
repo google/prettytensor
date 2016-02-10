@@ -163,6 +163,14 @@ just like a regular graph except that some variables are left unbound.
 
 See more details in [PrettyTensor class](docs/PrettyTensor.md).
 
+### Accessing Variables
+
+Pretty Tensor uses the standard graph collections from TensorFlow to store variables.  These can be accessed using `tf.get_collection(key)` with the following keys:
+
+* `tf.GraphKeys.VARIABLES`: all variables that should be saved (including some statistics).
+* `tf.GraphKeys.TRAINABLE_VARIABLES: all variables that can be trained (including those before a `stop_gradients` call). These are what would typically be called *parameters* of the model in ML parlance.
+* `pt.GraphKeys.TEST_VARIABLES`: variables used to evaluate a model. These are typically not saved and are reset by the LocalRunner.evaluate method to get a fresh evaluation.
+
 ## Authors
 
 Eider Moore (eiderman)
