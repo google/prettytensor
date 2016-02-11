@@ -22,6 +22,9 @@ and loaded variables need to have consistent names across refactorings and model
 tweaks. This means that the same variable will be reused if it has the same
 name, even if it is in a disconnected subgraph.
 """
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
 
 import tensorflow as tf
 
@@ -422,6 +425,13 @@ class SimpleStateSaver(object):
   def __init__(self):
     self._states = {}
 
+  def _as_shape_proto(self, shape):
+    # TODO(eiderman): On next release remove this hack.
+    try:
+      return tf.TensorShape(shape).as_proto()
+    except AttributeError:
+      return tf.tensor_util.MakeTensorShapeProto(shape)
+
   def AddState(self, state_name, dtype, shape):
     """Adds a state to the state saver.
 
@@ -439,9 +449,9 @@ class SimpleStateSaver(object):
       state_shape[0] = 1
       # For the TensorShapeProto, we need to use "0" to indicate the batch
       # size can be set at runtime - "None" cannot be stored in the proto.
-      shape_proto = tf.TensorShape([0] + state_shape[1:]).as_proto()
+      shape_proto = self._as_shape_proto([0] + state_shape[1:])
     else:
-      shape_proto = tf.TensorShape(state_shape).as_proto()
+      shape_proto = self._as_shape_proto(state_shape)
 
     # Add a constant tensor of zeros. At training time, this will initialize
     # the state with 0 - at inference time, this node is replaced by a feed.

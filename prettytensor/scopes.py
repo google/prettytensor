@@ -9,11 +9,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Contains methods related to making templates."""
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
 
 import contextlib
 import functools
 import traceback
 
+from six.moves import zip  # pylint: disable=redefined-builtin
 import tensorflow as tf
 
 from tensorflow.python.ops import variable_scope
@@ -111,7 +115,7 @@ class Template(object):
     try:
       self._reuse = True
       return self._func(*args, **kwargs)
-    except Exception, exc:
+    except Exception as exc:
       # Reraise the exception, but append the original definition to the
       # trace.
       args = exc.args

@@ -9,10 +9,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Adds methods related to recurrent networks."""
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import collections
 import math
 import numpy
 
+import six
+from six.moves import xrange  # pylint: disable=redefined-builtin
+from six.moves import zip  # pylint: disable=redefined-builtin
 import tensorflow as tf
 
 from tensorflow.python.ops import control_flow_ops
@@ -542,7 +549,7 @@ class RecurrentRunner(object):
 
     # Store the feeds and fetches for recurrent states.
     statesaver = bookkeeper.recurrent_state()
-    for state in statesaver.GetStateDescriptors().itervalues():
+    for state in six.itervalues(statesaver.GetStateDescriptors()):
       shape = [d.size for d in state['feed_shape'].dim]
       if shape[0] == 0:
         shape[0] = batch_size
@@ -553,7 +560,7 @@ class RecurrentRunner(object):
 
   def reset(self):
     self._state_feeds = {k: numpy.zeros_like(v)
-                         for k, v in self._state_feeds.iteritems()}
+                         for k, v in six.iteritems(self._state_feeds)}
 
   def run(self, fetch_list, feed_dict=None, sess=None):
     """Runs the graph with the provided feeds and fetches.

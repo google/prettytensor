@@ -9,6 +9,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Methods for Pretty Tensor."""
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import collections
 
 import tensorflow as tf
@@ -83,7 +87,7 @@ def _infer_unknown_dims(old_shape, shape_spec):
     raise ValueError('Input (%s) cannot be reshaped to %s.' %
                      (old_shape, shape_spec))
   if numerator and unknowns:
-    unknown_elements = numerator / denominator
+    unknown_elements = int(numerator / denominator)
     return [unknown_elements if x == -1 else x for x in result]
   else:
     return result

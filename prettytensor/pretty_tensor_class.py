@@ -15,6 +15,10 @@ see pretty_tensor_samples/ for usage examples.
 
 TODO(eiderman): This class should be broken apart into several smaller classes.
 """
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import collections
 import contextlib
 import functools
@@ -24,6 +28,9 @@ import operator
 import traceback
 
 import enum
+import six
+from six.moves import xrange  # pylint: disable=redefined-builtin
+from six.moves import zip  # pylint: disable=redefined-builtin
 import tensorflow as tf
 
 from prettytensor import chain_dict
@@ -202,7 +209,7 @@ def _subdivide_context(sequential, branch_count, join_function, name):
   """Creates a context so that branches/joins can be done using 'with'."""
   with sequential.g.as_default(), scopes.var_and_name_scope((name, None)):
     branches = []
-    for i in range(branch_count):
+    for i in xrange(branch_count):
       branches.append(SequentialLayerBuilder(copy=sequential)
                       .with_name('l%d' % i))
     yield tuple(branches)
@@ -237,7 +244,7 @@ def join_pretty_tensors(tensors, output, join_function=None, name='join'):
 
 def _merge_unbound_var_dicts(src, dst):
   """Merges src into dst and throws an exception if a value is incompatible."""
-  for k, v in src.iteritems():
+  for k, v in six.iteritems(src):
     if dst.get(k, v) != v:
       trace1 = ''.join(scopes.skip_common_stack_elements(v.stacktrace, dst[
           k].stacktrace))
@@ -252,13 +259,13 @@ def _merge_unbound_var_dicts(src, dst):
 def _assign_values_to_unbound_vars(unbound_vars, unbound_var_values):
   """Assigns values to the vars and raises ValueError if one is missing."""
   context = {}
-  for key, value in unbound_var_values.iteritems():
+  for key, value in six.iteritems(unbound_var_values):
     if key not in unbound_vars:
       raise ValueError('unexpected key: %s. Legal values are: %s' %
-                       (key, unbound_vars.keys()))
+                       (key, list(six.iterkeys(unbound_vars))))
     context[unbound_vars[key]] = value
   unspecified = []
-  for unbound_var in unbound_vars.itervalues():
+  for unbound_var in six.itervalues(unbound_vars):
     if unbound_var not in context:
       if unbound_var.has_default():
         context[unbound_var] = unbound_var.default
@@ -287,7 +294,7 @@ def construct_all(templates, **unbound_var_values):
   """
 
   def _merge_dicts(src, dst):
-    for k, v in src.iteritems():
+    for k, v in six.iteritems(src):
       if dst.get(k, v) != v:
         raise ValueError('Conflicting values bound for %s: %s and %s' %
                          (k, v, dst[k]))
@@ -353,16 +360,16 @@ class PrettyTensorTupleMixin(object):
     result = []
     for layer in self.flatten():
       if isinstance(layer, _DeferredLayer):
-        var_keys = {var.key for var in layer.unbound_vars.values()}
+        var_keys = {var.key for var in six.itervalues(layer.unbound_vars)}
         layers_bindings = {
             k: v
-            for k, v in bindings.iteritems() if k in var_keys
+            for k, v in six.iteritems(bindings) if k in var_keys
         }
         result.append(layer.bind(**layers_bindings))
-        found_vars.update(layers_bindings.iterkeys())
+        found_vars.update(six.iterkeys(layers_bindings))
       else:
         result.append(layer)
-    missing_vars = set(bindings.iterkeys()) - found_vars
+    missing_vars = set(six.iterkeys(bindings)) - found_vars
     if missing_vars:
       raise ValueError('Unused bindings: %s' % missing_vars)
     return self.__class__(*result)
@@ -448,7 +455,7 @@ class Loss(object):
     # have or need this method, so just return other items directly.
     obj = self.tensor
     conv_fn = getattr(obj, '_as_graph_element', None)
-    if conv_fn and callable(conv_fn):
+    if conv_fn and isinstance(conv_fn, collections.Callable):
       obj = conv_fn()
     return obj
 
@@ -700,7 +707,7 @@ class PrettyTensor(object):
     if isinstance(result, (PrettyTensor, Loss, PrettyTensorTupleMixin)):
       return result
     elif (isinstance(result, collections.Sequence) and
-          not isinstance(result, basestring)):
+          not isinstance(result, six.string_types)):
       return self.with_sequence(result)
     else:
       return self.with_tensor(result)
@@ -734,7 +741,7 @@ class PrettyTensor(object):
       defaults.
     """
     if _args is None:
-      _args = kwargs.iterkeys()
+      _args = six.iterkeys(kwargs)
     my_defaults = self.defaults
     for k in _args:
       if k not in kwargs:
@@ -785,7 +792,7 @@ class PrettyTensor(object):
       # have or need this method, so just return other items directly.
       obj = self.tensor
       conv_fn = getattr(obj, '_as_graph_element', None)
-      if conv_fn and callable(conv_fn):
+      if conv_fn and isinstance(conv_fn, collections.Callable):
         obj = conv_fn()
       return obj
 
@@ -876,6 +883,9 @@ class PrettyTensor(object):
 
   def __nonzero__(self):
     return True
+
+  # __nonzero__ is now called __bool__ in Python 3, so just do an alias.
+  __bool__ = __nonzero__
 
   def __iter__(self):
     if self.is_sequence():
@@ -1018,7 +1028,7 @@ class Layer(PrettyTensor):
 
 
 class UnboundVariable(object):
-  """A UnboundVariable is a variable with a value that is supplied using bind.
+  """An UnboundVariable is a variable with a value that is supplied using bind.
 
   UnboundVariables are typically used so that input layers can be specified at a
   later time or for hyper parameters. Supplying a UnboundVariable as an input
@@ -1055,8 +1065,7 @@ class _DeferredLayer(PrettyTensor):
     construction.
 
     During construction, any UnboundVariables or DeferredLayers are replaced
-    with their
-    proper values for that pass.
+    with their proper values for that pass.
 
     Args:
       books: The bookkeeper for bookkeeping.
@@ -1091,7 +1100,7 @@ class _DeferredLayer(PrettyTensor):
     self._scope = scope
     self._defaults = defaults or {}
     self._partial_context = partial_context or {}
-    for k in self._partial_context.iterkeys():
+    for k in six.iterkeys(self._partial_context):
       if k.key in self._unbound_vars:
         del self._unbound_vars[k.key]
 
@@ -1101,11 +1110,11 @@ class _DeferredLayer(PrettyTensor):
     elif isinstance(arg, _DeferredLayer):
       _merge_unbound_var_dicts(arg.unbound_vars, self._unbound_vars)
     elif (isinstance(arg, collections.Sequence) and
-          not isinstance(arg, basestring)):
+          not isinstance(arg, six.string_types)):
       for x in arg:
         self._merge_all_unbound_vars(x)
     elif isinstance(arg, collections.Mapping):
-      for x in arg.itervalues():
+      for x in six.itervalues(arg):
         self._merge_all_unbound_vars(x)
 
   @property
@@ -1136,10 +1145,11 @@ class _DeferredLayer(PrettyTensor):
     elif isinstance(arg, tuple):
       return tuple((self._replace_deferred(x, context) for x in arg))
     elif (isinstance(arg, collections.Sequence) and
-          not isinstance(arg, basestring)):
+          not isinstance(arg, six.string_types)):
       return [self._replace_deferred(x, context) for x in arg]
     elif isinstance(arg, collections.Mapping):
-      return {k: self._replace_deferred(v, context) for k, v in arg.iteritems()}
+      return {k: self._replace_deferred(v, context)
+              for k, v in six.iteritems(arg)}
     else:
       return arg
 
@@ -1184,14 +1194,15 @@ class _DeferredLayer(PrettyTensor):
     """
     new_context = dict(self._partial_context)
     unknown_keys = []
-    for k, v in bindings.iteritems():
+    for k, v in six.iteritems(bindings):
       if k not in self._unbound_vars:
         unknown_keys.append(k)
       new_context[self._unbound_vars[k]] = v
     if unknown_keys:
       raise ValueError(
           'The following keys are not associated with any unbound vars: %s, '
-          'legal values are %s' % (unknown_keys, self._unbound_vars.keys()))
+          'legal values are %s' %
+          (unknown_keys, list(self._unbound_vars.keys())))
     return _DeferredLayer(self.bookkeeper,
                           None,
                           (),
@@ -1546,11 +1557,11 @@ def _gen_ipython_string(func, args, defaults, original_doc):
     default_offset = len(args) - len(defaults)
   else:
     default_offset = len(args)
-  for i in range(len(args)):
+  for i, value in enumerate(args):
     if i >= default_offset:
-      magic_string += '%s=%s, ' % (args[i], defaults[i - default_offset])
+      magic_string += '%s=%s, ' % (value, defaults[i - default_offset])
     else:
-      magic_string += '%s, ' % args[i]
+      magic_string += '%s, ' % value
   if args:
     magic_string = magic_string[:-2]
   magic_string += ')\n\n'
@@ -1577,11 +1588,11 @@ def _remove_first_arg_from_doc(func):
 
 def _should_defer(input_layer, args, kwargs):
   """Checks to see if any of the args are templates."""
-  for arg in itertools.chain([input_layer], args, kwargs.itervalues()):
+  for arg in itertools.chain([input_layer], args, six.itervalues(kwargs)):
     if isinstance(arg, (_DeferredLayer, UnboundVariable)):
       return True
     elif (isinstance(arg, collections.Sequence) and
-          not isinstance(arg, basestring)):
+          not isinstance(arg, six.string_types)):
       if _should_defer(None, arg, {}):
         return True
     elif isinstance(arg, collections.Mapping):
@@ -1646,7 +1657,11 @@ class _RegisterBase(object):
     _valid_defaults.update(self._assign_defaults)
     default_args = sorted(_valid_defaults)
     default_values = [None] * len(_valid_defaults)
-    _set_ipython_string(PrettyTensor.with_defaults.im_func, default_args,
+    if six.PY2:
+      default_func = PrettyTensor.with_defaults.__func__
+    else:
+      default_func = PrettyTensor.with_defaults
+    _set_ipython_string(default_func, default_args,
                         default_values, _original_set_defaults_doc)
     _set_ipython_string(defaults_scope, default_args, default_values,
                         _original_defaults_scope_doc)
@@ -1860,6 +1875,10 @@ def _conversion_function(pt_wrapper, dtype=None, name=None, as_ref=False):
         (dtype, t.dtype, t))
   return t
 
-
-tf.register_tensor_conversion_function(
-    (PrettyTensor, Loss), _conversion_function, 100)
+# TODO(eiderman): On next release remove this hack.
+try:
+  tf.register_tensor_conversion_function(
+      (PrettyTensor, Loss), _conversion_function, 100)
+except AttributeError:
+  tf.ops.register_tensor_conversion_function(
+      (PrettyTensor, Loss), _conversion_function, 100)

@@ -14,10 +14,15 @@ The Shakespeare tutorial downloads a snippet of Shakespeare, munges the data
 into the correct format and then creates a 2 layer LSTM to predict the next
 character given the current character.
 """
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import random
 
 
 import numpy
+from six.moves import xrange  # pylint: disable=redefined-builtin
 import tensorflow as tf
 
 import prettytensor as pt
@@ -137,7 +142,7 @@ def sample(
 
 
 def main(_=None):
-  print 'Starting Shakespeare'
+  print('Starting Shakespeare')
 
   # Since we are feeding our data as numpy arrays, we need to create
   # placeholders in the graph.
@@ -226,18 +231,18 @@ def main(_=None):
           feed_data=pt.train.feed_numpy(BATCH_SIZE, shakespeare_in,
                                         shakespeare_out))
 
-      print 'Next character accuracy after epoch %d: %g%%' % (
-          epoch + 1, classification_accuracy * 100)
+      print('Next character accuracy after epoch %d: %g%%' % (
+          epoch + 1, classification_accuracy * 100))
 
       # Use a temperature smaller than 1 because the early stages of the model
       # don't assign much confidence.
-      print sample(inference_input,
+      print(sample(inference_input,
                    inference_logits,
                    max_length=128,
-                   temperature=0.5)
+                   temperature=0.5))
 
     # Print a sampling from the model.
-    print sample(inference_input, inference_logits)
+    print(sample(inference_input, inference_logits))
 
 
 if __name__ == '__main__':

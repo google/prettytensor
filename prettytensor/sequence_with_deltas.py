@@ -9,6 +9,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Provides a class that just implements a sequence with a delta count."""
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
 
 import collections
 

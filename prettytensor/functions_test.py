@@ -9,6 +9,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Test class for functions."""
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import unittest
 
 
@@ -254,8 +258,9 @@ class TensorFlowOpTest(unittest.TestCase):
             dtype=numpy.float32))
     tensor = tf.constant(values)
     out = self.Run(functions.leaky_relu(tensor))
-    for i in range(len(values)):
-      values[i] *= 0.01 if values[i] < 0 else 1
+    for i, value in enumerate(values):
+      if value < 0:
+        values[i] *= 0.01
     testing.assert_allclose(out[0], values, rtol=TOLERANCE)
 
   def testUnzip(self):

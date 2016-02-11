@@ -17,6 +17,9 @@ For now, please use pretty_tensor.py since this is in a state of flux.
 see [README.md](https://github.com/google/prettytensor) for documentation.
 see pretty_tensor_samples/ for usage examples.
 """
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
 
 # pylint: disable=unused-import
 from prettytensor import funcs

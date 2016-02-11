@@ -24,8 +24,13 @@ weights on each example. This also demonstrates how to efficiently reshape the
 network for the classifier and how to use dropout in both a training and eval
 graph.
 """
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 
 import numpy
+from six.moves import xrange  # pylint: disable=redefined-builtin
 import tensorflow as tf
 
 import prettytensor as pt
@@ -72,7 +77,7 @@ def create_model(text_in,
 
 
 def main(_=None):
-  print 'Starting Baby Names'
+  print('Starting Baby Names')
 
   # Since we are feeding our data as numpy arrays, we need to create
   # placeholders in the graph.
@@ -187,8 +192,8 @@ def main(_=None):
           feed_vars=(input_placeholder, output_placeholder, length_placeholder),
           feed_data=pt.train.feed_numpy(BATCH_SIZE, names, sex, lengths))
 
-      print 'Accuracy after epoch %d: %g%%' % (epoch + 1,
-                                               classification_accuracy * 100)
+      print('Accuracy after epoch %d: %g%%' % (
+          epoch + 1, classification_accuracy * 100))
 
 
 if __name__ == '__main__':

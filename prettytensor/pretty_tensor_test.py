@@ -9,6 +9,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Test class for PrettyTensor."""
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import math
 import operator
 import unittest
@@ -346,7 +350,7 @@ class PrettyTensorTest(pretty_tensor_testing.PtTestCase):
       self.assertEqual(self.input_layer, input_layer)
       return tf.constant('success')
     result = self.RunTensor(self.input_layer.test_method1())
-    self.assertEqual('success', result)
+    self.assertEqual(b'success', result)
 
   def testMethodRegistrationWithDefaults(self):
     # pylint: disable=unused-variable,invalid-name
@@ -355,14 +359,14 @@ class PrettyTensorTest(pretty_tensor_testing.PtTestCase):
       return tf.constant(funny_name)
 
     result = self.RunTensor(self.input_layer.test_method3())
-    self.assertEqual('not none', result)
+    self.assertEqual(b'not none', result)
     result = self.RunTensor(self.input_layer.test_method3(funny_name='other'))
-    self.assertEqual('other', result)
+    self.assertEqual(b'other', result)
     with prettytensor.defaults_scope(funny_name='something'):
       result = self.RunTensor(self.input_layer.test_method3())
-      self.assertEqual('something', result)
+      self.assertEqual(b'something', result)
       result = self.RunTensor(self.input_layer.test_method3(funny_name='other'))
-      self.assertEqual('other', result)
+      self.assertEqual(b'other', result)
 
   def testMethodRegistrationRepeated(self):
     # pylint: disable=unused-variable,invalid-name
@@ -388,7 +392,7 @@ class PrettyTensorTest(pretty_tensor_testing.PtTestCase):
       self.assertEqual(self.input_layer, input_layer)
       return tf.constant('success')
     result = self.RunTensor(self.input_layer.another_test())
-    self.assertEqual('success', result)
+    self.assertEqual(b'success', result)
 
   def testFunctionRegistration(self):
     # pylint: disable=unused-variable,invalid-name
@@ -632,7 +636,7 @@ class PrettyTensorTest(pretty_tensor_testing.PtTestCase):
 
     # Test reverse ops
     for op in operators:
-      print op.__name__
+      print(op.__name__)
       t1 = op(2., self.input)
       t2 = op(2., self.input_layer)
       r1 = self.RunTensor(t1)
@@ -652,7 +656,7 @@ class PrettyTensorTest(pretty_tensor_testing.PtTestCase):
       testing.assert_allclose(
           r1, r2, rtol=TOLERANCE, err_msg='Op: %s' % op.__name__)
 
-    operators.extend([operator.div])
+    operators.extend([operator.truediv])
     for op in operators:
       t1 = op(self.input, self.input_layer)
       t2 = op(self.input_layer, self.input)

@@ -23,6 +23,11 @@ This file is divided into roughly 4 parts:
 * Utility functions. These include normalizations that are used in embedding
   models as a non-linearity and a few others.
 """
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
+from six.moves import xrange  # pylint: disable=redefined-builtin
 import tensorflow as tf
 
 # To improve numerical stability, we want to not do an exponential above this
@@ -385,8 +390,8 @@ def unzip(x, split_dim, current_length, num_splits=2, name=None):
     x = tf.convert_to_tensor(x, name='x')
     # There is probably a more efficient way to do this.
     all_splits = tf.split(split_dim, current_length, x, name=scope)
-    splits = [[] for _ in range(num_splits)]
-    for i in range(current_length):
+    splits = [[] for _ in xrange(num_splits)]
+    for i in xrange(current_length):
       splits[i % num_splits].append(all_splits[i])
     return [tf.concat(split_dim, s) for s in splits]
 
@@ -402,6 +407,6 @@ def _last_index(x, default_dim):
 def _all_dims(x, default_dims=None):
   """Returns a list of dims in x or default_dims if the rank is unknown."""
   if x.get_shape().ndims is not None:
-    return range(x.get_shape().ndims)
+    return list(xrange(x.get_shape().ndims))
   else:
     return default_dims

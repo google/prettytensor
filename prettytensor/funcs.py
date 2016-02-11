@@ -13,7 +13,13 @@
 This exposes all of the standard PrettyTensor functions, but instead of
 chaining, they are invoked like regular functions.
 """
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import sys
+
+import six
 
 # pylint: disable=unused-import, wildcard-import
 from prettytensor.pretty_tensor_image_methods import *
@@ -30,7 +36,7 @@ def _remove_non_methods():
   # Import here so that it doesn't get added to the global namespace or deleted.
   # pylint: disable=g-import-not-at-top
   from prettytensor.pretty_tensor_class import PrettyTensor
-  for name, _ in my_globals.iteritems():
+  for name, _ in six.iteritems(my_globals):
     if not hasattr(PrettyTensor, name):
       delattr(cur_module, name)
   # Remove a couple of special ones....

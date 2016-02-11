@@ -13,11 +13,15 @@
 These methods are intended to aid experimentation.  For large datasets consider
 using readers and queues.
 """
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
 
 import itertools
 
 
 
+from six.moves import xrange  # pylint: disable=redefined-builtin
 import tensorflow as tf
 
 from prettytensor import bookkeeper
@@ -43,7 +47,7 @@ def feed_numpy(batch_size, *arrays):
   for a in arrays:
     if size != len(a):
       raise ValueError('All arrays must be the same size.')
-  count = size / batch_size
+  count = int(size / batch_size)
 
   for i in xrange(count):
     start = i * batch_size

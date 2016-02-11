@@ -9,8 +9,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Image methods for PrettyTensor."""
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import collections
-import numbers
 
 import tensorflow as tf
 
@@ -53,8 +56,8 @@ class batch_normalize(prettytensor.VarStoreMethod):
     Returns:
       Handle to the generated layer.
     """
-    assert isinstance(learned_moments_update_rate, (int, long, float))
-    assert isinstance(variance_epsilon, (int, long, float))
+    assert isinstance(learned_moments_update_rate, tf.compat.real_types)
+    assert isinstance(variance_epsilon, tf.compat.real_types)
     assert scale_after_normalization is not None
 
     # Allocate variables to hold the moving averages of the moments.
@@ -260,7 +263,7 @@ def _kernel(kernel_spec):
   Returns:
     A length 2 list.
   """
-  if isinstance(kernel_spec, numbers.Integral):
+  if isinstance(kernel_spec, tf.compat.integral_types):
     return [kernel_spec, kernel_spec]
   elif len(kernel_spec) == 1:
     return [kernel_spec[0], kernel_spec[0]]
@@ -280,7 +283,7 @@ def _stride(stride_spec):
   """
   if stride_spec is None:
     return [1, 1, 1, 1]
-  elif isinstance(stride_spec, numbers.Integral):
+  elif isinstance(stride_spec, tf.compat.integral_types):
     return [1, stride_spec, stride_spec, 1]
   elif len(stride_spec) == 1:
     return [1, stride_spec[0], stride_spec[0], 1]

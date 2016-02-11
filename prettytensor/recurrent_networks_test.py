@@ -9,12 +9,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Test class for the recurrent networks module."""
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import unittest
 
 
 
 import numpy
 from numpy import testing
+import six
+from six.moves import xrange  # pylint: disable=redefined-builtin
+from six.moves import zip  # pylint: disable=redefined-builtin
 import tensorflow as tf
 
 import prettytensor
@@ -83,7 +90,7 @@ class RecurrentNetworksTest(pretty_tensor_testing.PtTestCase):
 
     result = self.RunTensor(squashed.cleave_sequence())
 
-    for i in range(len(self.input_data)):
+    for i in xrange(len(self.input_data)):
       testing.assert_allclose(
           self.input_data[i], result[i],
           rtol=TOLERANCE)
@@ -112,7 +119,7 @@ class RecurrentNetworksTest(pretty_tensor_testing.PtTestCase):
 
     self.assertEquals([4, 13], lstm.shape)
     self.assertEquals(4, len(result))
-    for i in range(4):
+    for i in xrange(4):
       self.assertSequenceEqual(lstm.shape, result[i].shape)
 
   def testArbitraryBatchSizeLstm(self):
@@ -215,8 +222,8 @@ class RecurrentNetworksTest(pretty_tensor_testing.PtTestCase):
 
     for state in self.states:
       self.assertTrue(
-          state[0] in self.sequence.requested_tensors,
-          '%s missing: %s' % (state[0], self.sequence.requested_tensors.keys()))
+          state[0] in self.sequence.requested_tensors, '%s missing: %s' %
+          (state[0], list(six.iterkeys(self.sequence.requested_tensors))))
     self.assertEqual(
         len(self.states), len(self.sequence.requested_tensors),
         'Wrong number of Tensor states.')
@@ -228,8 +235,8 @@ class RecurrentNetworksTest(pretty_tensor_testing.PtTestCase):
 
     for state in self.states:
       self.assertTrue(
-          state[0] in self.sequence.requested_tensors,
-          '%s missing: %s' % (state[0], self.sequence.requested_tensors.keys()))
+          state[0] in self.sequence.requested_tensors, '%s missing: %s' %
+          (state[0], list(six.iterkeys(self.sequence.requested_tensors))))
     self.assertEqual(
         len(self.states), len(self.sequence.requested_tensors),
         'Wrong number of Tensor states.')

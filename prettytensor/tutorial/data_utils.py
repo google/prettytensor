@@ -9,16 +9,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Data utils bundles the utilties to download and munge data in numpy."""
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
 
 import csv
 import gzip
 import os.path
 import sys
-import urllib
 
 
 
 import numpy as np
+from six.moves import xrange  # pylint: disable=redefined-builtin
+from six.moves.urllib import request
 import tensorflow as tf
 
 import prettytensor as pt
@@ -36,9 +40,9 @@ def maybe_download(url, filename):
     os.mkdir(WORK_DIRECTORY)
   filepath = os.path.join(WORK_DIRECTORY, filename)
   if not os.path.exists(filepath):
-    filepath, _ = urllib.urlretrieve(url + filename, filepath)
+    filepath, _ = request.urlretrieve(url + filename, filepath)
     statinfo = os.stat(filepath)
-    print 'Succesfully downloaded', filename, statinfo.st_size, 'bytes.'
+    print('Successfully downloaded', filename, statinfo.st_size, 'bytes.')
   return filepath
 
 
@@ -53,7 +57,7 @@ def mnist_extract_data(filename, num_images):
   Returns:
     The data as a numpy array with the values centered.
   """
-  print 'Extracting', filename
+  print('Extracting', filename)
   with gzip.open(filename) as bytestream:
     bytestream.read(16)
     buf = bytestream.read(28 * 28 * num_images)
@@ -66,7 +70,7 @@ def mnist_extract_data(filename, num_images):
 
 def mnist_extract_labels(filename, num_images):
   """Extract the labels into a 1-hot matrix [image index, label index]."""
-  print 'Extracting', filename
+  print('Extracting', filename)
   with gzip.open(filename) as bytestream:
     bytestream.read(8)
     buf = bytestream.read(1 * num_images)
@@ -186,6 +190,6 @@ def reshape_data(tensor, per_example_length=1):
   # This will make it compatible with the Pretty Tensor function
   # cleave_sequence.
   dims = [1, 0]
-  for i in range(2, tensor.get_shape().ndims):
+  for i in xrange(2, tensor.get_shape().ndims):
     dims.append(i)
   return pt.wrap(tf.transpose(tensor, dims)).reshape([-1, per_example_length])

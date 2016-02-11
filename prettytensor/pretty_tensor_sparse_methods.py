@@ -9,8 +9,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Holds PrettyTensor methods related to sparse data types."""
-
-import numbers
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
 
 import tensorflow as tf
 
@@ -31,7 +32,7 @@ def to_dense_one_hot(labels, class_count):
     TypeError: If class_count is not an integer or labels is not an integer
       Tensor.
   """
-  if not isinstance(class_count, numbers.Integral):
+  if not isinstance(class_count, tf.compat.integral_types):
     raise TypeError('class_count must be an integer type.')
   if labels.dtype.base_dtype not in (tf.int32, tf.int64):
     raise TypeError('Labels must be an integer: %s' % labels.dtype)

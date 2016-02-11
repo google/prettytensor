@@ -9,7 +9,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Test class for PrettyTensor."""
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import unittest
+import six
 import tensorflow as tf
 
 import prettytensor
@@ -38,7 +43,7 @@ class PtTestCase(unittest.TestCase):
     """Convenience method to run a tensor."""
     if init:
       self.sess.run(tf.initialize_all_variables())
-    if isinstance(layer, (tf.Tensor, basestring)):
+    if isinstance(layer, (tf.Tensor, six.string_types)):
       return self.sess.run(layer)
     elif layer.is_sequence():
       return self.sess.run(layer.sequence)

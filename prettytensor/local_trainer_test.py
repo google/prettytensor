@@ -9,6 +9,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Tests for local_trainer."""
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import itertools
 import os
 import shutil
@@ -37,8 +41,13 @@ class LocalTrainerTest(unittest.TestCase):
       raise ValueError('This method only supports float32: %s' % dtype)
 
   def setUp(self):
+    # TODO(eiderman): On next release remove this hack.
+    try:
+      tf.reset_default_graph()
+    except AttributeError:
+      tf.ops.reset_default_graph()
     self.prng = numpy.random.RandomState(42)
-    tf.reset_default_graph()
+
     self.input = tf.placeholder(tf.float32, [4, 2])
     self.target = tf.placeholder(tf.float32)
     xor_inputs = numpy.array([[0., 0.], [1., 0.], [1., 1.], [0., 1.]])

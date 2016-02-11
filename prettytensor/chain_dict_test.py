@@ -9,6 +9,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Test class for ChainDict."""
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
 
 import unittest
 
@@ -91,7 +94,8 @@ class ChainDictTest(unittest.TestCase):
     d = chain_dict.ChainDict({'KEY': 'VALUE'})
     self.assertEqual('VALUE', d['KEY'])
     self.assertEqual(len(d), 1)
-    self.assertEqual(d.items(), [('KEY', 'VALUE')])
+    # In Python 3, items produces an iterator.
+    self.assertEqual(list(d.items()), [('KEY', 'VALUE')])
 
 if __name__ == '__main__':
   unittest.main()

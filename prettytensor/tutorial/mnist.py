@@ -14,7 +14,12 @@ This uses Pretty Tensor to define and train either a 2 layer model or a
 convolutional model in the style of LeNet 5.
 See: http://yann.lecun.com/exdb/lenet/
 """
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
 
+
+from six.moves import xrange  # pylint: disable=redefined-builtin
 import tensorflow as tf
 
 import prettytensor as pt
@@ -126,8 +131,8 @@ def main(_=None):
           TEST_SIZE,
           feed_vars=(image_placeholder, labels_placeholder),
           feed_data=pt.train.feed_numpy(BATCH_SIZE, test_images, test_labels))
-      print 'Accuracy after %d epoch %g%%' % (epoch + 1,
-                                              classification_accuracy * 100)
+      print('Accuracy after %d epoch %g%%' % (
+          epoch + 1, classification_accuracy * 100))
 
 
 if __name__ == '__main__':

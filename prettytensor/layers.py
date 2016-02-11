@@ -12,6 +12,10 @@
 
 NB: This is used by PrettyTensor, but it will be deprecated.  Please do not use!
 """
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import math
 
 import tensorflow as tf

@@ -13,11 +13,17 @@
 See trainer.py in the parent directory for a full featured trainer that runs
 well with multiple replicas.
 """
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
 
 import itertools
 import os.path
 import time
 
+import six
+from six.moves import xrange  # pylint: disable=redefined-builtin
+from six.moves import zip  # pylint: disable=redefined-builtin
 import tensorflow as tf
 
 from prettytensor import bookkeeper
@@ -107,7 +113,7 @@ class Runner(object):
   def _log_and_save(self, sess, results):
     step = results[0]
     to_print = [x for x in results[1:] if x is not None]
-    print '[%d] %s' % (step, to_print)
+    print('[%d] %s' % (step, to_print))
     if self._save_path:
       self._saver.save(sess, self._save_path, step)
 
@@ -169,7 +175,7 @@ class Runner(object):
       if print_every and not log_this_time:
         self._log_and_save(sess, results)
     except tf.errors.OutOfRangeError:
-      print 'Done training -- epoch limit reached'
+      print('Done training -- epoch limit reached')
     finally:
       # When done, ask the threads to stop.
       coord.request_stop()
@@ -198,7 +204,7 @@ class Runner(object):
       `cost_to_log` from the final step.
     """
     costs = [train_op]
-    if (not isinstance(cost_to_log, basestring) and
+    if (not isinstance(cost_to_log, six.string_types) and
         hasattr(cost_to_log, '__iter__')):
       costs.extend(cost_to_log)
     else:
