@@ -40,8 +40,8 @@ The easiest installation is just to use pip:
 ### Setup your input
     my_inputs = # numpy array of shape (BATCHES, BATCH_SIZE, DATA_SIZE)
     my_labels = # numpy array of shape (BATCHES, BATCH_SIZE, CLASSES)
-    input_tensor = tf.placeholder([BATCH_SIZE, DATA_SIZE])
-    label_tensor = tf.placeholder([BATCH_SIZE, CLASSES])
+    input_tensor = tf.placeholder(np.float32, shape=(BATCH_SIZE, DATA_SIZE))
+    label_tensor = tf.placeholder(np.float32, shape=(BATCH_SIZE, CLASSES))
     pretty_input = pt.wrap(input_tensor)
 
 ### Define your model
@@ -52,14 +52,17 @@ The easiest installation is just to use pip:
 ### Train and evaluate
     accuracy = softmax.evaluate_classifier(label_tensor)
 
-    tf.train.GradientDescentOptimizer(0.1)  # learning rate
+    optimizer = tf.train.GradientDescentOptimizer(0.1)  # learning rate
     train_op = pt.apply_optimizer(optimizer, losses=[loss])
+    
+    init_op = tf.initialize_all_variables()
+
     with tf.Session() as sess:
-      for inp, label in zip(my_inputs, my_labels):
-        unused_loss_value, accuracy_value = sess.run(
-            [loss, accuracy],
-            {input_tensor: inp, label_tensor: label})
-        print 'Accuracy: %g' % accuracy_value
+        sess.run(init_op)
+        for inp, label in zip(my_inputs, my_labels):
+            unused_loss_value, accuracy_value = sess.run([loss, accuracy],
+                                     {input_tensor: inp, label_tensor: label})
+            print 'Accuracy: %g' % accuracy_value
 
 ## Features
 
