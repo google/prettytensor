@@ -1256,7 +1256,7 @@ class _DeferredLayer(PrettyTensor):
   def with_name(self, name):
     """Sets the name scope for future operations."""
     with self.g.as_default(), tf.variable_scope(name) as var_scope:
-      name_scope = _get_current_name_scope()
+      name_scope = scopes._get_current_name_scope()
       return _DeferredLayer(self.bookkeeper,
                             None,
                             (),
@@ -1607,13 +1607,6 @@ _defaults_to_methods = collections.defaultdict(list)
 
 # If we are in a method scope, then we don't want to add the full id.
 _in_method_scope = False
-
-
-def _get_current_name_scope():
-  """Gets the current name scope."""
-  # pylint: disable=protected-access
-  g = tf.get_default_graph()
-  return g._name_stack[0] + '/'
 
 
 @contextlib.contextmanager

@@ -54,10 +54,20 @@ def var_and_name_scope(names):
 
       vs_key = tf.get_collection(variable_scope._VARSCOPE_KEY)
       try:
-        vs_key[0] = variable_scope._VariableScope(
-            old_vs.reuse,
-            name=full_name,
-            initializer=old_vs.initializer)
+        # TODO(eiderman): Remove this hack or fix the full file.
+        try:
+          vs_key[0] = tf.VariableScope(
+              old_vs.reuse,
+              name=full_name,
+              initializer=old_vs.initializer,
+              regularizer=old_vs.regularizer,
+              caching_device=old_vs.caching_device)
+        except AttributeError:
+          vs_key[0] = variable_scope._VariableScope(
+              old_vs.reuse,
+              name=full_name,
+              initializer=old_vs.initializer)
+
         vs_key[0].name_scope = scope
         yield scope, vs_key[0]
       finally:
@@ -68,7 +78,11 @@ def _get_current_name_scope():
   """Gets the current name scope."""
   # pylint: disable=protected-access
   g = tf.get_default_graph()
-  return g._name_stack[0] + '/'
+  # TODO(eiderman): Remove this hack once TF update is released.
+  if isinstance(g._name_stack, tuple):
+    return g._name_stack[0] + '/'
+  else:
+    return g._name_stack + '/'
 
 
 def _get_last_part_of_name_scope(scope):

@@ -157,7 +157,7 @@ def main(_=None):
   # calculate inside the utility function.
   names, sex, lengths = data_utils.baby_names(TIMESTEPS)
 
-  epoch_size = len(names) / BATCH_SIZE
+  epoch_size = len(names) // BATCH_SIZE
   # Create the gradient optimizer and apply it to the graph.
   # pt.apply_optimizer adds regularization losses and sets up a step counter
   # (pt.global_step()) for you.

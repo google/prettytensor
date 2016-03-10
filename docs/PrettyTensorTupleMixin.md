@@ -16,10 +16,10 @@ build_from_flattened.
 
 - - -
 
+[TOC]
 
 
-
-## <a name="as_fn"></a>as_fn()
+## as_fn() {#as_fn}
 
 
 
@@ -43,7 +43,7 @@ A function that takes the arguments of binding_order.
 
 - - -
 
-## <a name="bind"></a>bind()
+## bind() {#bind}
 
 
 
@@ -55,7 +55,7 @@ Makes the bindings to each item in this and returns a new tuple.
 
 - - -
 
-## <a name="build_from_flattened"></a>build_from_flattened(flattened)
+## build_from_flattened(flattened) {#build_from_flattened}
 
 
 
@@ -67,14 +67,14 @@ Given a flattened structure from flatten, make a new version of this.
 
 - - -
 
-## <a name="construct"></a>construct()
+## construct() {#construct}
 
 
 
 
 - - -
 
-## <a name="flatten"></a>flatten()
+## flatten() {#flatten}
 
 
 
@@ -90,7 +90,7 @@ A list of data that should be bound and constructed, by default just self.
 
 - - -
 
-## <a name="has_unbound_vars"></a>has_unbound_vars()
+## has_unbound_vars() {#has_unbound_vars}
 
 
 

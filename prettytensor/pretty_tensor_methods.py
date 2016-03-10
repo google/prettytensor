@@ -299,10 +299,11 @@ class fully_connected(prettytensor.VarStoreMethod):
       ValueError: if the head_shape is not rank 2  or the number of input nodes
       (second dim) is not known.
     """
-    if len(input_layer.shape) != 2:
+    if input_layer.get_shape().ndims != 2:
       raise ValueError(
-          'Cannot perform fully connected on tensor with shape %s' %
-          input_layer.shape)
+          'fully_connected requires a rank 2 Tensor with known second '
+          'dimension: %s'
+          % input_layer.get_shape())
     in_size = input_layer.shape[1]
     if input_layer.shape[1] is None:
       raise ValueError('Number of input nodes must be known.')

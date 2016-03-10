@@ -127,6 +127,10 @@ def shakespeare(chunk_size):
   with open(file_name) as f:
     shakespeare_full = f.read()
 
+  # Truncate the data.
+  length = (len(shakespeare_full) // chunk_size) * chunk_size
+  if length < len(shakespeare_full):
+    shakespeare_full = shakespeare_full[:length]
   arr = np.array([convert_to_int(c) for c in shakespeare_full])[
       0:len(shakespeare_full) / chunk_size * chunk_size]
   return arr.reshape((len(arr) / chunk_size, chunk_size))

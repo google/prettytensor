@@ -65,8 +65,9 @@ def apply_activation(
         '%s/sixes' % y.op.name)
   elif activation in (functions.l2_normalize, tf.nn.l2_normalize,
                       functions.l1_normalize):
-    books.add_scalar_summary(tf.reduce_mean(tf.sqrt(tf.sum(tf.square(x), 1))),
-                             '%s/length' % y.op.name)
+    books.add_scalar_summary(
+        tf.reduce_mean(tf.sqrt(tf.reduce_sum(
+            tf.square(x), 1))), '%s/length' % y.op.name)
   return y
 
 

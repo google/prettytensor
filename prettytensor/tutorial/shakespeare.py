@@ -219,14 +219,14 @@ def main(_=None):
 
       runner.train_model(train_op,
                          training_result.loss,
-                         len(shakespeare_in) / BATCH_SIZE,
+                         len(shakespeare_in) // BATCH_SIZE,
                          feed_vars=(input_placeholder, output_placeholder),
                          feed_data=pt.train.feed_numpy(
                              BATCH_SIZE, shakespeare_in, shakespeare_out),
                          print_every=10)
       classification_accuracy = runner.evaluate_model(
           accuracy,
-          len(shakespeare_in) / BATCH_SIZE,
+          len(shakespeare_in) // BATCH_SIZE,
           feed_vars=(input_placeholder, output_placeholder),
           feed_data=pt.train.feed_numpy(BATCH_SIZE, shakespeare_in,
                                         shakespeare_out))

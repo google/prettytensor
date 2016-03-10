@@ -286,9 +286,12 @@ class Bookkeeper(object):
       with tf.device(avg_var.device):
         if ignore_nan:
           var = tf.select(tf.is_finite(var), var, avg_var)
-        avg_update = tf.assign(
-            avg_var, avg_var - (1 - decay) * (avg_var - var),
-            validate_shape=False)
+        if var.get_shape().is_fully_defined():
+          avg_update = tf.assign_sub(avg_var, (1 - decay) * (avg_var - var))
+        else:
+          avg_update = tf.assign(
+              avg_var, avg_var - (1 - decay) * (avg_var - var),
+              validate_shape=False)
       self._g.add_to_collection(GraphKeys.UPDATE_OPS, avg_update)
       return avg_var
 

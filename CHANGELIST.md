@@ -1,3 +1,11 @@
+## 0.5.3
+
+1. Fixing tutorials (thanks jkahn!)
+2. Adding a precicion and recall evaluation.
+3. Various bug fixes.
+
+Tested on TF 0.7.1
+
 ## 0.5.2
 
 1. Various bug fixes

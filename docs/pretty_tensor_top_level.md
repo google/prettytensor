@@ -3,7 +3,7 @@
 
 
 
-
+[TOC]
 - - -
 ## Class Bookkeeper
 
@@ -37,13 +37,13 @@ and other multi-loss structures.
 - - -
 
 
-### <a name="get_shape"></a>get_shape()
+### get_shape() {#get_shape}
 
 
 
 
 
-### <a name="is_sequence"></a>is_sequence()
+### is_sequence() {#is_sequence}
 
 
 
@@ -54,7 +54,7 @@ Losses are never sequences.
 
 
 
-### <a name="mark_as_required"></a>mark_as_required()
+### mark_as_required() {#mark_as_required}
 
 
 
@@ -118,7 +118,7 @@ caveats.
 - - -
 
 
-### <a name="create_deferred"></a>create_deferred(func, input_layer, deferred_args, deferred_kwargs, name)
+### create_deferred(func, input_layer, deferred_args, deferred_kwargs, name) {#create_deferred}
 
 
 
@@ -141,13 +141,13 @@ A _DeferredLayer that will execute func in the correct scopes.
 
 
 
-### <a name="create_method"></a>create_method(obj)
+### create_method(obj) {#create_method}
 
 
 
 
 
-### <a name="fill_kwargs"></a>fill_kwargs(input_layer, kwargs)
+### fill_kwargs(input_layer, kwargs) {#fill_kwargs}
 
 
 
@@ -178,7 +178,7 @@ scoping).
 - - -
 
 
-### <a name="create_method"></a>create_method(func)
+### create_method(func) {#create_method}
 
 
 
@@ -189,7 +189,7 @@ Creates the method.
 
 
 
-### <a name="fill_kwargs"></a>fill_kwargs(input_layer, kwargs)
+### fill_kwargs(input_layer, kwargs) {#fill_kwargs}
 
 
 
@@ -204,7 +204,7 @@ Applies name_suffix and defaults to kwargs and returns the result.
 
 ## UnboundVariable
 
-A UnboundVariable is a variable with a value that is supplied using bind.
+An UnboundVariable is a variable with a value that is supplied using bind.
 
 UnboundVariables are typically used so that input layers can be specified at a
 later time or for hyper parameters. Supplying a UnboundVariable as an input
@@ -213,7 +213,7 @@ variable automatically forces the graph to be a template.
 - - -
 
 
-### <a name="has_default"></a>has_default()
+### has_default() {#has_default}
 
 
 
@@ -231,7 +231,7 @@ method.
 - - -
 
 
-### <a name="variable"></a>variable(var_name, shape, init, dt=<dtype: 'float32'>, train=True)
+### variable(var_name, shape, init, dt=<dtype: 'float32'>, train=True) {#variable}
 
 
 
@@ -269,7 +269,7 @@ A TensorFlow tensor.
 
 - - -
 
-## <a name="apply_optimizer"></a>apply_optimizer(losses, regularize=True, include_marked=True)
+## apply_optimizer(losses, regularize=True, include_marked=True) {#apply_optimizer}
 
 
 
@@ -312,7 +312,7 @@ An operation to use for training that also updates any required ops such as
 
 - - -
 
-## <a name="for_default_graph"></a>for_default_graph()
+## for_default_graph() {#for_default_graph}
 
 
 
@@ -338,7 +338,7 @@ A new Bookkeeper.
 
 - - -
 
-## <a name="for_new_graph"></a>for_new_graph()
+## for_new_graph() {#for_new_graph}
 
 
 
@@ -365,7 +365,7 @@ A new Bookkeeper.
 
 - - -
 
-## <a name="construct_all"></a>construct_all()
+## construct_all() {#construct_all}
 
 
 
@@ -395,7 +395,7 @@ A list of results corresponding to templates.
 
 - - -
 
-## <a name="create_composite_loss"></a>create_composite_loss(regularize=True, include_marked=True, name=cost)
+## create_composite_loss(regularize=True, include_marked=True, name=cost) {#create_composite_loss}
 
 
 
@@ -419,7 +419,7 @@ A single tensor that is the sum of all losses.
 - - -
 
 
-## <a name="defaults_scope"></a>defaults_scope(...
+## defaults_scope(... {#defaults_scope}
 
 Many Pretty Tensor methods support setting defaults. The supported defaults and methods that use them are:
 
@@ -441,7 +441,7 @@ Many Pretty Tensor methods support setting defaults. The supported defaults and 
 
 * `phase`:
     * [batch_normalize](PrettyTensor.md#batch_normalize)
-    * [evaluate_classifier](PrettyTensor.md#evaluate_classifier)
+    * [evaluate_precision_recall](PrettyTensor.md#evaluate_precision_recall)
     * [dropout](PrettyTensor.md#dropout)
 
 * `scale_after_normalization`:
@@ -462,7 +462,7 @@ Many Pretty Tensor methods support setting defaults. The supported defaults and 
 
 - - -
 
-## <a name="global_step"></a>global_step()
+## global_step() {#global_step}
 
 
 
@@ -474,7 +474,7 @@ Returns the global step variable.
 
 - - -
 
-## <a name="join_pretty_tensors"></a>join_pretty_tensors(output, join_function=None, name=join)
+## join_pretty_tensors(output, join_function=None, name=join) {#join_pretty_tensors}
 
 
 
@@ -502,7 +502,7 @@ The result of calling with_tensor on output
 
 - - -
 
-## <a name="make_template"></a>make_template(func)
+## make_template(func) {#make_template}
 
 
 
@@ -514,14 +514,14 @@ Given an arbitrary function, wrap it so that it does parameter sharing.
 
 - - -
 
-## <a name="recurrent_state"></a>recurrent_state()
+## recurrent_state() {#recurrent_state}
 
 
 
 
 - - -
 
-## <a name="set_recurrent_state_saver"></a>set_recurrent_state_saver()
+## set_recurrent_state_saver() {#set_recurrent_state_saver}
 
 
 
@@ -533,7 +533,7 @@ Sets the state saver used for recurrent sequences.
 
 - - -
 
-## <a name="template"></a>template(books=None, optional=False)
+## template(books=None, optional=False) {#template}
 
 
 
@@ -559,7 +559,7 @@ A template that can be constructed or attached to other layers and that
 
 - - -
 
-## <a name="with_update_ops"></a>with_update_ops()
+## with_update_ops() {#with_update_ops}
 
 
 
@@ -581,7 +581,7 @@ A new op that returns the same value as train_op, but also runs the
 
 - - -
 
-## <a name="wrap"></a>wrap(books=None, tensor_shape=None)
+## wrap(books=None, tensor_shape=None) {#wrap}
 
 
 
@@ -604,7 +604,7 @@ A layer.
 
 - - -
 
-## <a name="wrap_sequence"></a>wrap_sequence(books=None, tensor_shape=None)
+## wrap_sequence(books=None, tensor_shape=None) {#wrap_sequence}
 
 
 
@@ -629,6 +629,10 @@ A layer.
 
 
 ## Extensions
+
+
+
+### [recurrent_networks](recurrent_networks.md)
 
 
 

@@ -248,6 +248,12 @@ class PrettyTensorTest(pretty_tensor_testing.PtTestCase):
     self.assertTrue(st.layer_parameters['weights'])
     self.assertTrue(st.layer_parameters['bias'])
 
+  def testUnknownShapeConv(self):
+    input_data = tf.placeholder(tf.float32)
+
+    with self.assertRaises(ValueError):
+      self.Wrap(input_data).conv2d([3, 3], 100)
+
   def testConvBatchNorm(self):
     st = self.input_layer.sequential()
     st.reshape([DIM_SAME, DIM_SAME, DIM_SAME, 1])
@@ -445,6 +451,12 @@ class PrettyTensorTest(pretty_tensor_testing.PtTestCase):
         100).fully_connected(200)
     self.assertEquals([None, 200], nn.tensor.get_shape().as_list())
 
+  def testUnknownShapeFullyConnected(self):
+    input_data = tf.placeholder(tf.float32)
+
+    with self.assertRaises(ValueError):
+      self.Wrap(input_data).fully_connected(100)
+
   def testPartiallyUnknownShape(self):
     shape = list(self.input_data.shape)
     shape[1] = None
@@ -529,6 +541,18 @@ class PrettyTensorTest(pretty_tensor_testing.PtTestCase):
        .softmax_classifier(3).softmax
        .evaluate_classifier(actual, phase=prettytensor.Phase.test))
 
+  def testBinaryCrossEntropy(self):
+    n1 = numpy.array([[2., 3., 4., 5., -6., -7.]], dtype=numpy.float32)
+    n2 = numpy.array([[1., 1., 0., 0., 0., 1.]], dtype=numpy.float32)
+    ftensor1 = prettytensor.wrap(n1)
+    ftensor2 = prettytensor.wrap(n2)
+    out = self.RunTensor(
+        ftensor1.binary_cross_entropy_with_logits(ftensor2))
+    testing.assert_allclose(
+        out,
+        numpy.sum(n1 * (1-n2) + numpy.log(1 + numpy.exp(-n1)), axis=1),
+        rtol=0.00001)
+
   def testWeightedSoftmaxEval(self):
     np_prediction = numpy.array(
         [
@@ -548,7 +572,6 @@ class PrettyTensorTest(pretty_tensor_testing.PtTestCase):
             [0, 1, 0],
         ],
         dtype=numpy.float)
-    weights = numpy.array([1, 1, 1, 0, 0], dtype=numpy.float)
     prediction = self.Wrap(np_prediction)
 
     evaluation = prediction.evaluate_classifier(
@@ -561,6 +584,46 @@ class PrettyTensorTest(pretty_tensor_testing.PtTestCase):
         per_example_weights=[1.0, 0.0, 0.0, 1.0, 1.0])
     result = self.RunTensor(evaluation)
     testing.assert_allclose(numpy.array([0.6666667]), result, rtol=TOLERANCE)
+
+  def testPrecisionAndRecall(self):
+    np_prediction = numpy.array(
+        [
+            [0, 1, 1],   # tp = 1, fp = 1, fn = 1, tn = 0
+            [0, 0, 1],   # tp = 0, fp = 1, fn = 1, tn = 1
+            [1, 0, 0],   # tp = 1, fp = 0, fn = 0, tn = 2
+            [0, 1, 0],   # tp = 0, fp = 1, fn = 1, tn = 1
+            [0, 1, 0],   # tp = 1, fp = 0, fn = 1, tn = 1
+        ],
+        dtype=numpy.float)
+    actual = numpy.array(
+        [
+            [1, 1, 0],
+            [1, 0, 0],
+            [1, 0, 0],
+            [0, 0, 1],
+            [0, 1, 1],
+        ],
+        dtype=numpy.float)
+    prediction = self.Wrap(np_prediction)
+
+    evaluation = prediction.evaluate_precision_recall(tf.constant(actual))
+    p, r = self.RunTensor(evaluation)
+    testing.assert_allclose(numpy.array(.5), p, rtol=TOLERANCE)
+    testing.assert_allclose(numpy.array(3./7), r, rtol=TOLERANCE)
+
+    evaluation = prediction.evaluate_precision_recall(
+        tf.constant(actual),
+        per_example_weights=[0.0, 0.0, 0.0, 1.0, 1.0])
+    p, r = self.RunTensor(evaluation)
+    testing.assert_allclose(numpy.array(.5), p, rtol=TOLERANCE)
+    testing.assert_allclose(numpy.array(1. / 3), r, rtol=TOLERANCE)
+
+    evaluation = prediction.evaluate_precision_recall(
+        tf.constant(actual),
+        per_example_weights=[1.0, 0.0, 0.0, 1.0, 1.0])
+    p, r = self.RunTensor(evaluation)
+    testing.assert_allclose(numpy.array(.5), p, rtol=TOLERANCE)
+    testing.assert_allclose(numpy.array(.4), r, rtol=TOLERANCE)
 
   def testToDenseOneHot(self):
     data = numpy.array([1, 5, 2, 9])

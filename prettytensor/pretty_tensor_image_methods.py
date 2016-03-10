@@ -108,7 +108,10 @@ class batch_normalize(prettytensor.VarStoreMethod):
 
 def _pool(input_layer, pool_fn, kernel, stride, edges, name):
   """Applies a pooling function."""
-  assert len(input_layer.shape) == 4
+  input_layer.get_shape().assert_has_rank(4)
+  if input_layer.get_shape().ndims not in (None, 4):
+    raise ValueError(
+        'Pooling requires a rank 4 tensor: %s' % input_layer.get_shape())
   kernel = _kernel(kernel)
   stride = _stride(stride)
   size = [1, kernel[0], kernel[1], 1]
@@ -204,9 +207,9 @@ class conv2d(prettytensor.VarStoreMethod):
       ValueError: If head is not a rank 4 tensor or the  depth of the input
         (4th dim) is not known.
     """
-    if len(input_layer.shape) != 4:
-      raise ValueError(
-          'Cannot perform conv2d on tensor with shape %s' % input_layer.shape)
+    if input_layer.get_shape().ndims != 4:
+      raise ValueError('conv2d requires a rank 4 Tensor with a known depth %s' %
+                       input_layer.get_shape())
     if input_layer.shape[3] is None:
       raise ValueError('Input depth must be known')
     kernel = _kernel(kernel)

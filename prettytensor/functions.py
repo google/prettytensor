@@ -48,11 +48,7 @@ def l1_regression_loss(y, target, name=None):
   with tf.op_scope([y, target], name, 'l1_regression') as scope:
     y = tf.convert_to_tensor(y, name='y')
     target = tf.convert_to_tensor(target, name='target')
-    reduction_indices = _all_dims(y)
-    if reduction_indices:
-      reduction_indices = reduction_indices[1:]
-    return tf.reduce_sum(
-        tf.abs(y - target), reduction_indices=reduction_indices, name=scope)
+    return reduce_batch_sum(tf.abs(y - target), name=scope)
 
 
 def l2_regression_sq_loss(y, target, name=None):
@@ -68,11 +64,27 @@ def l2_regression_sq_loss(y, target, name=None):
   with tf.op_scope([y, target], name, 'l2_regression_sq') as scope:
     y = tf.convert_to_tensor(y, name='y')
     target = tf.convert_to_tensor(target, name='target')
-    reduction_indices = _all_dims(y)
-    if reduction_indices:
-      reduction_indices = reduction_indices[1:]
-    return tf.reduce_sum(
-        tf.square(y - target), reduction_indices=reduction_indices, name=scope)
+    return reduce_batch_sum(tf.square(y - target), name=scope)
+
+
+def reduce_batch_sum(x, name=None):
+  with tf.op_scope([x], name, 'reduce_batch_sum') as scope:
+    ndims = x.get_shape().ndims
+    if ndims == 0:
+      raise ValueError('Cannot reduce a scalar into batches.')
+    elif ndims == 1:
+      return x  # Don't include a useless sum.
+    elif ndims:
+      reduction_indices = list(range(1, x.get_shape().ndims))
+      shape = [x.get_shape().dims[0]]
+    else:
+      reduction_indices = tf.range(1, tf.size(tf.shape(x)))
+      shape = [None]  # We don't know much about the shape, but it is rank 1.
+    result = tf.reduce_sum(x, reduction_indices=reduction_indices, name=scope)
+
+    # Give a shape hint in case we have extra information.
+    result.set_shape(shape)
+    return result
 
 
 def l2_regression_loss(y, target, name=None):
@@ -88,7 +100,7 @@ def l2_regression_loss(y, target, name=None):
   with tf.op_scope([y, target], name, 'l2_regression') as scope:
     y = tf.convert_to_tensor(y, name='y')
     target = tf.convert_to_tensor(target, name='target')
-    return capped_sqrt(l2_regression_sq_loss(y, target, name=scope))
+    return tf.sqrt(l2_regression_sq_loss(y, target, name=scope))
 
 
 def binary_cross_entropy_loss_with_logits(x, target, name=None):
@@ -102,20 +114,27 @@ def binary_cross_entropy_loss_with_logits(x, target, name=None):
     name: the name for this op, defaults to binary_cross_entropy_with_logits
   Returns:
     -(target * -softplus(-x) + (1-target) * (-x - softplus(-x)))
+  Raises:
+    ValueError: If shapes are incompatible.
   """
-  with tf.op_scope([x, target], name, 'binary_cross_entropy_with_logits'):
-    bce_loss = -tf.add(
-        tf.mul(target, -tf.nn.softplus(-x)),
-        tf.mul(1 - target, -x - tf.nn.softplus(-x)))
-    return bce_loss
+  with tf.op_scope([x, target], name,
+                   'binary_cross_entropy_with_logits') as scope:
+    x.get_shape().assert_is_compatible_with(target.get_shape())
+    neg_softplus = -tf.nn.softplus(-x)
+    return -tf.add(
+        tf.mul(target, neg_softplus),
+        tf.mul(1 - target, -x + neg_softplus),
+        name=scope)
 
 
-def cos_distance(t1, t2, name=None):
+def cos_distance(t1, t2, epsilon=1e-12, name=None):
   """Cos distance between t1 and t2 and caps the gradient of the Square Root.
 
   Args:
     t1: A tensor
     t2: A tensor that can be multiplied by t1.
+    epsilon: A lower bound value for the distance. The square root is used as
+      the normalizer.
     name: Optional name for this op.
   Returns:
     The cos distance between t1 and t2.
@@ -123,9 +142,10 @@ def cos_distance(t1, t2, name=None):
   with tf.op_scope([t1, t2], name, 'cos_distance') as scope:
     t1 = tf.convert_to_tensor(t1, name='t1')
     t2 = tf.convert_to_tensor(t2, name='t2')
+    x_inv_norm = tf.rsqrt(tf.maximum(length_squared(t1) * length_squared(t2),
+                                     epsilon))
     return tf.sub(1.0,
-                  dot_product(t1, t2) / capped_sqrt(
-                      length_squared(t1) * length_squared(t2)),
+                  dot_product(t1, t2) * x_inv_norm,
                   name=scope)
 
 
@@ -159,12 +179,14 @@ def l2_distance_sq(t1, t2, name=None):
     return length_squared(tf.sub(t1, t2), name=scope)
 
 
-def l2_distance(t1, t2, name=None):
+def l2_distance(t1, t2, epsilon=1e-12, name=None):
   """l2 distance between t1 and t2 and caps the gradient of the Square Root.
 
   Args:
     t1: A tensor.
     t2: A tensor that is the same size as t1.
+    epsilon: A lower bound for distance, useful to avoid sqrt of very small
+      values that can blow up gradients.
     name: Optional name for this op.
   Returns:
     The l2 distance between t1 and t2.
@@ -172,7 +194,7 @@ def l2_distance(t1, t2, name=None):
   with tf.op_scope([t1, t2], name, 'l2_distance') as scope:
     t1 = tf.convert_to_tensor(t1, name='t1')
     t2 = tf.convert_to_tensor(t2, name='t2')
-    return capped_sqrt(l2_distance_sq(t1, t2, scope))
+    return tf.sqrt(tf.maximum(l2_distance_sq(t1, t2, scope), epsilon))
 
 
 def l1_distance(t1, t2, name=None):
@@ -236,32 +258,18 @@ def softplus(x, scale=1.0, name=None):
         name=scope)
 
 
-def l2_normalize(x, dim, name=None):
-  """l2 normalizes x and caps the gradient of the Square Root.
-
-  Args:
-    x: The tensor to normalize.
-    dim: The dimension to normalize along.
-    name: Optional name for this op.
-  Returns:
-    x normalized along dim.
-  """
-  with tf.op_scope([x], name, 'l2_normalize') as scope:
-    x = tf.convert_to_tensor(x, name='x')
-    x = tf.verify_tensor_all_finite(x, 'Error at input %s' % scope)
-    x_norm = capped_sqrt(tf.reduce_sum(tf.square(x), [dim], keep_dims=True))
-    return tf.verify_tensor_all_finite(tf.div(x,
-                                              x_norm,
-                                              name=scope),
-                                       'Error at %s' % scope)
+# Copied to keep API consistency with other functions.
+l2_normalize = tf.nn.l2_normalize
 
 
-def l1_normalize(x, dim, name=None):
+def l1_normalize(x, dim, epsilon=1e-12, name=None):
   """l1 normalizes x.
 
   Args:
     x: The tensor to normalize.
     dim: The dimension to normalize along.
+    epsilon: Lower bound on the norm, used to avoid exploding gradients as the
+      norm approaches 0.
     name: Optional name for this op.
   Returns:
     x normalized along dim.
@@ -269,38 +277,9 @@ def l1_normalize(x, dim, name=None):
   with tf.op_scope([x], name, 'l1_normalize') as scope:
     x = tf.convert_to_tensor(x, name='x')
     x = tf.verify_tensor_all_finite(x, 'Error at input %s' % scope)
-    x_norm = tf.reduce_sum(tf.abs(x), [dim], keep_dims=True)
-    return tf.verify_tensor_all_finite(tf.div(x,
-                                              x_norm,
-                                              name=scope),
-                                       'Error at %s' % scope)
-
-
-# pylint: disable=protected-access
-def capped_sqrt(x, name=None):
-  """Caps the gradient of the square root.
-
-  This can help with numerical stability if you are taking square roots of very
-  small values (like in the distance functions).
-
-  Args:
-    x: A tensor.
-    name: The name for this operation.
-  Returns:
-    sqrt(x) with the gradient capped.
-  """
-  with tf.op_scope([x], name, 'capped_sqrt') as scope:
-    x = tf.convert_to_tensor(x, name='x')
-    with tf.get_default_graph().gradient_override_map({'Sqrt': 'capped_sqrt'}):
-      return tf.sqrt(x, name=scope)
-
-
-@tf.RegisterGradient('capped_sqrt')
-def _capped_sqrt_grad(op, grad):
-  y = op.outputs[0]  # y = x^(1/2)
-  # Cap the gradient.
-  return grad * tf.select(tf.less(y, 0.0001), tf.zeros_like(y) + 50.0,
-                          (.5 * tf.inv(y)))
+    x_norm = tf.maximum(tf.reduce_sum(tf.abs(x), [dim], keep_dims=True),
+                        epsilon)
+    return tf.div(x, x_norm, name=scope)
 
 
 def every_other(x, name=None):

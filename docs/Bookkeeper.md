@@ -17,10 +17,10 @@ The following properties are exposed:
 
 - - -
 
+[TOC]
 
 
-
-## <a name="add_average_summary"></a>add_average_summary(var, tag=None, decay=0.999, ignore_nan=True)
+## add_average_summary(var, tag=None, decay=0.999, ignore_nan=True) {#add_average_summary}
 
 
 
@@ -55,7 +55,7 @@ The averaged variable.
 
 - - -
 
-## <a name="add_histogram_summary"></a>add_histogram_summary(tensor, tag=None)
+## add_histogram_summary(tensor, tag=None) {#add_histogram_summary}
 
 
 
@@ -67,7 +67,7 @@ Add a summary operation to visualize any tensor.
 
 - - -
 
-## <a name="add_loss"></a>add_loss(loss, name=None, regularization=False, add_summaries=True)
+## add_loss(loss, name=None, regularization=False, add_summaries=True) {#add_loss}
 
 
 
@@ -87,14 +87,14 @@ Append a loss to the total loss for the network.
 
 - - -
 
-## <a name="add_losses"></a>add_losses(losses, regularization=False)
+## add_losses(losses, regularization=False) {#add_losses}
 
 
 
 
 - - -
 
-## <a name="add_scalar_summary"></a>add_scalar_summary(x, tag=None)
+## add_scalar_summary(x, tag=None) {#add_scalar_summary}
 
 
 
@@ -106,14 +106,14 @@ Adds a scalar summary for x.
 
 - - -
 
-## <a name="check_summary"></a>check_summary(tag)
+## check_summary(tag) {#check_summary}
 
 
 
 
 - - -
 
-## <a name="create_composite_loss"></a>create_composite_loss(losses, regularize=True, include_marked=True, name=cost)
+## create_composite_loss(losses, regularize=True, include_marked=True, name=cost) {#create_composite_loss}
 
 
 
@@ -140,7 +140,7 @@ A single tensor that is the sum of all losses.
 
 - - -
 
-## <a name="exponential_moving_average"></a>exponential_moving_average(var, avg_var=None, decay=0.999, ignore_nan=False)
+## exponential_moving_average(var, avg_var=None, decay=0.999, ignore_nan=False) {#exponential_moving_average}
 
 
 
@@ -173,7 +173,7 @@ The averaged variable.
 
 - - -
 
-## <a name="with_update_ops"></a>with_update_ops(train_op)
+## with_update_ops(train_op) {#with_update_ops}
 
 
 

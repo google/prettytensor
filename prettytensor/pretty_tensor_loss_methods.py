@@ -197,13 +197,32 @@ def binary_cross_entropy_with_logits(input_layer,
     raise ValueError('Labels must be set')
   if target.dtype not in (tf.float32, tf.float64):
     raise ValueError('Unexpected type for target:  %s' % target.dtype)
-  return apply_regression(input_layer,
-                          functions.binary_cross_entropy_loss_with_logits,
-                          target,
-                          [],
-                          name='%s_bce_loss' % name,
-                          loss_weight=loss_weight,
-                          per_example_weights=per_example_weights)
+  with tf.name_scope('stats'):
+    selected, sum_retrieved, sum_relevant = _compute_precision_recall(
+        input_layer, target, 0, per_example_weights)
+    precision = selected / sum_retrieved
+    recall = selected / sum_relevant
+    if precision.get_shape().is_fully_defined():
+      input_layer.bookkeeper.add_average_summary(
+          precision, 'average_precision_%s' % name)
+    if recall.get_shape().is_fully_defined():
+      input_layer.bookkeeper.add_average_summary(
+          recall, 'average_recall_%s' % name)
+    input_layer.bookkeeper.add_scalar_summary(
+        tf.reduce_sum(tf.to_float(tf.greater(input_layer, 0))), 'activations')
+
+  def _batch_sum_bce(x, target, name='binary_cross_entropy'):
+    return functions.reduce_batch_sum(
+        functions.binary_cross_entropy_loss_with_logits(x, target, name=name))
+
+  return apply_regression(
+      input_layer,
+      _batch_sum_bce,
+      target,
+      [],
+      name='%s_bce_loss' % name,
+      loss_weight=loss_weight,
+      per_example_weights=per_example_weights)
 
 
 @prettytensor.RegisterCompoundOp
@@ -266,6 +285,70 @@ def softmax(input_layer,
 
 
 @prettytensor.Register(assign_defaults=('phase',))
+def evaluate_precision_recall(input_layer,
+                              labels,
+                              threshold=0.5,
+                              per_example_weights=None,
+                              name=PROVIDED,
+                              phase=Phase.train):
+  """Computes the precision and recall of the prediction vs the labels.
+
+  Args:
+    input_layer: A Pretty Tensor object.
+    labels: The target labels to learn as a float tensor.
+    threshold: The threshold to use to decide if the prediction is true.
+    per_example_weights: A Tensor with a weight per example.
+    name: An optional name.
+    phase: The phase of this model; non training phases compute a total across
+      all examples.
+  Returns:
+    Precision and Recall.
+  """
+  _ = name  # Eliminate warning, name used for namescoping by PT.
+  selected, sum_retrieved, sum_relevant = _compute_precision_recall(
+      input_layer, labels, threshold, per_example_weights)
+
+  if phase != Phase.train:
+    dtype = tf.float32
+    # Create the variables in all cases so that the load logic is easier.
+    relevant_count = tf.get_variable(
+        'relevant_count',
+        [],
+        dtype,
+        tf.zeros_initializer,
+        collections=[bookkeeper.GraphKeys.TEST_VARIABLES],
+        trainable=False)
+    retrieved_count = tf.get_variable(
+        'retrieved_count',
+        [],
+        dtype,
+        tf.zeros_initializer,
+        collections=[bookkeeper.GraphKeys.TEST_VARIABLES],
+        trainable=False)
+    selected_count = tf.get_variable(
+        'selected_count',
+        [],
+        dtype,
+        tf.zeros_initializer,
+        collections=[bookkeeper.GraphKeys.TEST_VARIABLES],
+        trainable=False)
+
+    with input_layer.g.device(selected_count.device):
+      selected = tf.assign_add(selected_count, selected)
+    with input_layer.g.device(retrieved_count.device):
+      sum_retrieved = tf.assign_add(retrieved_count, sum_retrieved)
+    with input_layer.g.device(relevant_count.device):
+      sum_relevant = tf.assign_add(relevant_count, sum_relevant)
+
+  return (tf.select(tf.equal(sum_retrieved, 0),
+                    tf.zeros_like(selected),
+                    selected/sum_retrieved),
+          tf.select(tf.equal(sum_relevant, 0),
+                    tf.zeros_like(selected),
+                    selected/sum_relevant))
+
+
+@prettytensor.Register
 def evaluate_classifier(input_layer, labels, per_example_weights=None,
                         topk=1, name=PROVIDED, phase=Phase.train):
   """Calculates the total ratio of correct predictions across all examples seen.
@@ -288,10 +371,11 @@ def evaluate_classifier(input_layer, labels, per_example_weights=None,
     phase: In training mode the batch accuracy is returned and in eval/infer
       modes a total average is calculated.
   Returns:
-    A Pretty Tensor with the ratio of correct to total examples seen..
+    A Pretty Tensor with the ratio of correct to total examples seen.
   """
   correct_predictions, examples = _compute_average_correct(
       input_layer, labels, per_example_weights, topk=topk)
+  parameters = {}
   if phase != Phase.train:
     dtype = tf.float32
     # Create the variables using tf.Variable because we don't want to share.
@@ -303,12 +387,43 @@ def evaluate_classifier(input_layer, labels, per_example_weights=None,
                           name='correct_%d' % topk,
                           collections=[bookkeeper.GraphKeys.TEST_VARIABLES],
                           trainable=False)
+    parameters['count'] = count
+    parameters['correct'] = correct
     with input_layer.g.device(count.device):
       examples = tf.assign_add(count, examples)
     with input_layer.g.device(correct.device):
       correct_predictions = tf.assign_add(correct, correct_predictions)
   return input_layer.with_tensor(
-      tf.div(correct_predictions, examples, name=name))
+      tf.div(correct_predictions, examples, name=name), parameters)
+
+
+def _compute_precision_recall(input_layer, labels, threshold,
+                              per_example_weights):
+  """Returns the numerator of both, the denominator of precision and recall."""
+
+  # To apply per_example_weights, we need to collapse each row to a scalar, but
+  # we really want the sum.
+  labels.get_shape().assert_is_compatible_with(input_layer.get_shape())
+  relevant = tf.to_float(tf.greater(labels, 0))
+  retrieved = tf.to_float(tf.greater(input_layer, threshold))
+  selected = relevant * retrieved
+
+  if per_example_weights:
+    per_example_weights = tf.convert_to_tensor(per_example_weights,
+                                               name='per_example_weights')
+    if selected.get_shape().dims:
+      per_example_weights.get_shape().assert_is_compatible_with(
+          [selected.get_shape().dims[0]])
+    else:
+      per_example_weights.get_shape().assert_is_compatible_with([None])
+    per_example_weights = tf.to_float(tf.greater(per_example_weights, 0))
+    selected = functions.reduce_batch_sum(selected) * per_example_weights
+    relevant = functions.reduce_batch_sum(relevant) * per_example_weights
+    retrieved = functions.reduce_batch_sum(retrieved) * per_example_weights
+  sum_relevant = tf.reduce_sum(relevant)
+  sum_retrieved = tf.reduce_sum(retrieved)
+  selected = tf.reduce_sum(selected)
+  return selected, sum_retrieved, sum_relevant
 
 
 def _compute_average_correct(input_layer, labels, per_example_weights, topk=1):

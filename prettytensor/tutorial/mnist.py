@@ -30,8 +30,8 @@ tf.app.flags.DEFINE_string(
 FLAGS = tf.app.flags.FLAGS
 
 BATCH_SIZE = 50
-EPOCH_SIZE = 60000 / BATCH_SIZE
-TEST_SIZE = 10000 / BATCH_SIZE
+EPOCH_SIZE = 60000 // BATCH_SIZE
+TEST_SIZE = 10000 // BATCH_SIZE
 
 tf.app.flags.DEFINE_string('model', 'full',
                            'Choose one of the models, either full or conv')

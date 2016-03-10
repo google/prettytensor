@@ -26,7 +26,6 @@ from tensorflow.python.ops import control_flow_ops
 
 from prettytensor import bookkeeper
 from prettytensor import pretty_tensor_class as prettytensor
-from prettytensor.pretty_tensor_class import DIM_SAME
 from prettytensor.pretty_tensor_class import PROVIDED
 
 # TODO(eiderman): Figure out the best dimensionality for this.
@@ -125,10 +124,9 @@ def lstm_cell(input_layer,
     i += c.diagonal_matrix_mul(stddev=stddev, init=init)
     f += c.diagonal_matrix_mul(stddev=stddev, init=init)
 
+  f_gate = f.apply(tf.sigmoid, name='f_gate')
   new_c = (
-      c * f.apply(tf.sigmoid,
-                  name='f_gate') + i.apply(tf.sigmoid,
-                                           name='i_gate') * j.apply(tf.tanh))
+      c * f_gate + i.apply(tf.sigmoid, name='i_gate') * j.apply(tf.tanh))
   if peephole:
     o += new_c.diagonal_matrix_mul(stddev=stddev, init=init)
 
@@ -164,9 +162,9 @@ def gru_cell(input_layer, state, num_units, bias=True, stddev=None, init=None):
   concat = layer.concat(1, [state]).fully_connected(2 * num_units,
                                                     bias=bias,
                                                     bias_init=1.0,
-                                                    activation_fn=tf.sigmoid,
+                                                    activation_fn=None,
                                                     stddev=stddev,
-                                                    init=init)
+                                                    init=init).apply(tf.sigmoid)
 
   split = concat.split(1, 2)
   r = split[0]
@@ -174,9 +172,9 @@ def gru_cell(input_layer, state, num_units, bias=True, stddev=None, init=None):
 
   c = layer.concat(1, [r * state]).fully_connected(num_units,
                                                    bias=bias,
-                                                   activation_fn=tf.tanh,
+                                                   activation_fn=None,
                                                    stddev=stddev,
-                                                   init=init)
+                                                   init=init).apply(tf.tanh)
   new_h = u * state + (1 - u) * c
   if input_layer.is_sequential_builder():
     new_h = input_layer.set_head(input_layer)
@@ -492,9 +490,6 @@ class embedding_lookup(prettytensor.VarStoreMethod):
 
     embeddings = self.variable('params', full_shape, init=init)
 
-    result_shape = [DIM_SAME]
-    result_shape.extend(embedding_shape)
-
     name = 'params_1' if name == 'params' else name
     return input_layer.with_tensor(
         tf.nn.embedding_lookup(embeddings, head, name=name),
@@ -506,12 +501,16 @@ class embedding_lookup(prettytensor.VarStoreMethod):
 # to the input.
 def lstm_state_tuples(num_nodes, name):
   """Convenience so that the names of the vars are defined in the same file."""
+  if not isinstance(num_nodes, tf.compat.integral_types):
+    raise ValueError('num_nodes must be an integer: %s' % num_nodes)
   return [(STATE_NAME % name + '_0', tf.float32, num_nodes),
           (STATE_NAME % name + '_1', tf.float32, num_nodes)]
 
 
 def gru_state_tuples(num_nodes, name):
   """Convenience so that the names of the vars are defined in the same file."""
+  if not isinstance(num_nodes, tf.compat.integral_types):
+    raise ValueError('num_nodes must be an integer: %s' % num_nodes)
   return [(STATE_NAME % name + '_0', tf.float32, num_nodes)]
 
 
