@@ -38,17 +38,17 @@ class ScopesTest(unittest.TestCase):
     self.assertNotEqual(len(first), len(result))
 
   def test_get_current_name_scope(self):
-    self.assertEquals('/', scopes._get_current_name_scope())
+    self.assertEquals('/', scopes.get_current_name_scope())
     self.assertEquals('', scopes._get_last_part_of_name_scope('/'))
     with tf.name_scope('one') as scope:
-      self.assertEquals(scope, scopes._get_current_name_scope())
+      self.assertEquals(scope, scopes.get_current_name_scope())
       self.assertEquals('one', scopes._get_last_part_of_name_scope(scope))
 
     with tf.name_scope('one') as scope:
-      self.assertEquals(scope, scopes._get_current_name_scope())
+      self.assertEquals(scope, scopes.get_current_name_scope())
       self.assertEquals('one_1', scopes._get_last_part_of_name_scope(scope))
       with tf.name_scope('two') as nested_scope:
-        self.assertEquals(nested_scope, scopes._get_current_name_scope())
+        self.assertEquals(nested_scope, scopes.get_current_name_scope())
       self.assertEquals('two',
                         scopes._get_last_part_of_name_scope(nested_scope))
 

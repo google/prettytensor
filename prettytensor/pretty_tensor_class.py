@@ -1256,7 +1256,7 @@ class _DeferredLayer(PrettyTensor):
   def with_name(self, name):
     """Sets the name scope for future operations."""
     with self.g.as_default(), tf.variable_scope(name) as var_scope:
-      name_scope = scopes._get_current_name_scope()
+      name_scope = scopes.get_current_name_scope()
       return _DeferredLayer(self.bookkeeper,
                             None,
                             (),

@@ -74,7 +74,7 @@ def var_and_name_scope(names):
         vs_key[0] = old_vs
 
 
-def _get_current_name_scope():
+def get_current_name_scope():
   """Gets the current name scope."""
   # pylint: disable=protected-access
   g = tf.get_default_graph()
