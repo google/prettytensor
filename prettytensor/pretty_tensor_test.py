@@ -282,6 +282,15 @@ class PrettyTensorTest(pretty_tensor_testing.PtTestCase):
     self.assertTrue(st.layer_parameters['weights'])
     self.assertTrue(st.layer_parameters['bias'])
 
+  def testFullTranspose(self):
+    st = self.input_layer.sequential()
+    st.flatten()
+    st.fully_connected(20, transpose_weights=True)
+    result = self.RunTensor(st)
+    self.assertEqual(20, result.shape[1])
+    self.assertTrue(st.layer_parameters['weights'])
+    self.assertTrue(st.layer_parameters['bias'])
+
   def testFullWithVariableStart(self):
     input_layer = prettytensor.wrap(tf.Variable(self.input_data))
 
@@ -552,6 +561,22 @@ class PrettyTensorTest(pretty_tensor_testing.PtTestCase):
         out,
         numpy.sum(n1 * (1-n2) + numpy.log(1 + numpy.exp(-n1)), axis=1),
         rtol=0.00001)
+
+  def testSampledSoftmax(self):
+    """Tests that sampled softmax runs properly."""
+    actual = numpy.array([
+        [1],
+        [0],
+    ], dtype=numpy.int64)
+    softmax, loss = (
+        self.input_layer
+        .flatten()
+        .softmax_classifier_with_sampled_loss(3, actual, num_sampled=2))
+
+    self.sess.run(tf.initialize_all_variables())
+    out_softmax, out_loss = self.sess.run((softmax, loss))
+    self.assertEqual(out_softmax.shape, (2, 3))
+    self.assertEqual(out_loss.shape, ())
 
   def testWeightedSoftmaxEval(self):
     np_prediction = numpy.array(

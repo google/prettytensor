@@ -273,6 +273,7 @@ class fully_connected(prettytensor.VarStoreMethod):
                stddev=None,
                bias=True,
                bias_init=0.,
+               transpose_weights=False,
                name=PROVIDED):
     """Adds the parameters for a fully connected layer and returns a tensor.
 
@@ -291,6 +292,8 @@ class fully_connected(prettytensor.VarStoreMethod):
       stddev: A standard deviation to use in parameter initialization.
       bias: Set to False to not have a bias.
       bias_init: The initial value for the bias.
+      transpose_weights: Flag indicating if weights should be transposed;
+        this is useful for loading models with a different shape.
       name: The name for this operation is also used to create/find the
         parameter variables.
     Returns:
@@ -318,12 +321,14 @@ class fully_connected(prettytensor.VarStoreMethod):
     elif stddev is not None:
       raise ValueError('Do not set both init and stddev.')
     dtype = input_layer.tensor.dtype
+    weight_shape = [size, in_size] if transpose_weights else [in_size, size]
+
     params = self.variable(
         'weights',
-        [in_size, size],
+        weight_shape,
         init,
         dt=dtype)
-    y = tf.matmul(input_layer, params)
+    y = tf.matmul(input_layer, params, transpose_b=transpose_weights)
     layers.add_l2loss(books, params, l2loss)
     if bias:
       y += self.variable(

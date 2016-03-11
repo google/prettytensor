@@ -643,7 +643,7 @@ A LayerWrapper with the flattened tensor.
 
 - - -
 
-## fully_connected(size, activation_fn=None, l2loss=None, init=None, stddev=None, bias=True, bias_init=0.0, name=None) {#fully_connected}
+## fully_connected(size, activation_fn=None, l2loss=None, init=None, stddev=None, bias=True, bias_init=0.0, transpose_weights=False, name=None) {#fully_connected}
 
 
 
@@ -665,6 +665,8 @@ The current head must be a rank 2 Tensor.
 * stddev: A standard deviation to use in parameter initialization.
 * bias: Set to False to not have a bias.
 * bias_init: The initial value for the bias.
+* transpose_weights: Flag indicating if weights should be transposed;
+ this is useful for loading models with a different shape.
 * name: The name for this operation is also used to create/find the
  parameter variables.
 
@@ -1112,6 +1114,64 @@ A tuple of the softmax's name and the loss tensor's name in m.bits.
 
 
 * ValueError: If the datatype is wrong.
+
+
+- - -
+
+## softmax_classifier_with_sampled_loss(num_classes, labels, num_sampled, num_true=None, sampled_values=None, remove_accidental_hits=True, loss_weight=None, per_example_weights=None, name=softmax_classifier) {#softmax_classifier_with_sampled_loss}
+
+
+
+Applies softmax and if labels is not None, then it adds a sampled loss.
+
+This is a faster way to train a softmax classifier over a huge number of
+classes. It is generally an underestimate of the full softmax loss.
+
+At inference time, you can compute full softmax probabilities with the
+expression `tf.nn.softmax(tf.matmul(inputs, weights) + biases)`.
+
+See `tf.nn.sampled_softmax_loss` for more details.
+
+Also see Section 3 of [Jean et al., 2014](http://arxiv.org/abs/1412.2007)
+([pdf](http://arxiv.org/pdf/1412.2007.pdf)) for the math.
+
+Note: If you depend on the softmax part of the loss, then you will lose most
+of the speed benefits of sampling the loss. It should be used for evaluation
+only and not executed on every update op.
+
+Note: This is not checkpoint compatible with `softmax_classifier` since it
+optimizes a transpose by pushing it down to the `fully_connected` layer.
+
+#### Args:
+
+
+* activations of the input network.
+ num_classes: An `int`. The number of possible classes.
+ labels: A `Tensor` of type `int64` and shape `[batch_size,
+* num_true]`. The target classes. Note that this format differs from
+* the `labels` argument of `nn.softmax_cross_entropy_with_logits`.
+ num_sampled: An `int`. The number of classes to randomly sample per batch.
+ num_true: An `int`. The number of target classes per training example,
+ defaults to the second dim of labels if known or 1.
+ sampled_values: a tuple of (`sampled_candidates`, `true_expected_count`,
+ `sampled_expected_count`) returned by a `*_candidate_sampler` function.
+ (if None, we default to `log_uniform_candidate_sampler`)
+ remove_accidental_hits: A `bool`. whether to remove "accidental hits"
+* where a sampled class equals one of the target classes. Default is
+* True.
+ loss_weight: A scalar multiplier for the loss.
+ per_example_weights: A Tensor with a weight per example.
+ name: The optional name.
+
+#### Returns:
+
+A tuple of the handle to softmax and a handle to the loss tensor.
+
+
+#### Raises:
+
+
+* ValueError: If inputs or labels do not have the right shape.
 
 
 - - -
