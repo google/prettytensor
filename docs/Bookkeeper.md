@@ -14,6 +14,8 @@ The following properties are exposed:
 * g: The graph.
 * train_op: The training operation, if setup_training was called.
 * loss: A list of losses.
+* summary_collections: Sets the default tag for all summaries created after
+  this point. Use `None` to disable summaries.
 
 - - -
 
@@ -169,6 +171,18 @@ The averaged variable.
 
 
 * ValueError: if decay is not in [0, 1).
+
+
+- - -
+
+## reset_summary_collections() {#reset_summary_collections}
+
+
+
+Sets the summary collections to the default.
+
+
+
 
 
 - - -

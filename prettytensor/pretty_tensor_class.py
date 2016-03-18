@@ -50,7 +50,7 @@ PAD_VALID = 'VALID'
 PROVIDED = None
 
 # Maintain a list of valid defaults so they can be validated.
-_valid_defaults = set()
+_valid_defaults = {'summary_collections'}
 _defaults = {}
 
 # A constant used to disambiguate None from unspecified in a couple of optional
@@ -113,7 +113,7 @@ def wrap(tensor, books=None, tensor_shape=None):
   elif isinstance(tensor, UnboundVariable):
     def set_input_from_unbound_var(data):
       """Sets the input from the given unbound_var."""
-      if data:
+      if data is not None:
         return wrap(data, books)
       else:
         return None
@@ -144,7 +144,7 @@ def template(key, books=None, optional=False):
 
   def set_input_from_unbound_var(data):
     """Sets the input from the given unbound_var."""
-    if data:
+    if data is not None:
       return wrap(data, books)
     else:
       return None
@@ -189,6 +189,15 @@ def defaults_scope(**kwargs):
   old_defaults = _defaults
   _defaults = chain_dict.ChainDict(_defaults)
   _defaults.update(kwargs)
+  # Special logic to support summary_collections.
+  # This is added here because introducing more scopes would add more confusion
+  # than overloading this one a bit.
+  books = bookkeeper.for_default_graph()
+  if 'summary_collections' in _defaults:
+    books.summary_collections = _defaults['summary_collections']
+  else:
+    books.reset_summary_collections()
+
   yield _defaults
   _defaults = old_defaults
 
@@ -929,7 +938,7 @@ class Layer(PrettyTensor):
     # pylint: disable=protected-access
     if copy:
       super(self.__class__, self).__init__(books or copy.bookkeeper)
-      if tensor or sequence:
+      if tensor is not None or sequence is not None:
         self._tensor = tensor
         self._sequence = sequence
       else:
@@ -944,7 +953,7 @@ class Layer(PrettyTensor):
       self._scope = None if scope is _unspecified else scope
       self._defaults = defaults or {}
     if name is None:
-      if tensor:
+      if tensor is not None:
         self._name = self._tensor.op.name
       else:
         self._name = self._sequence[0].op.name
@@ -1507,7 +1516,7 @@ class VarStoreMethod(object):
       var_name: The unique name of this variable.  If a variable with the same
         name exists, then it is returned.
       shape: The shape of the variable.
-      init: The init function to use.
+      init: The init function to use or a Tensor to copy.
       dt: The datatype, defaults to float.  This will automatically extract the
         base dtype.
       train: Whether or not the variable should be trained.
@@ -1518,6 +1527,8 @@ class VarStoreMethod(object):
         and the variable already exists or if the specification of a reused
         variable does not match the original.
     """
+    # Make sure it is a TF dtype and convert it into a base dtype.
+    dt = tf.as_dtype(dt).base_dtype
     if var_name in self.vars:
       v = self.vars[var_name]
       if v.get_shape() != shape:
@@ -1525,14 +1536,18 @@ class VarStoreMethod(object):
             'Shape mismatch: %s vs %s. Perhaps a UnboundVariable had '
             'incompatible values within a graph.' % (v.get_shape(), shape))
       return v
-    else:
-      # Make sure it is a TF dtype and convert it into a base dtype.
-      dt = tf.as_dtype(dt).base_dtype
+    elif callable(init):
+
       v = tf.get_variable(var_name,
                           shape=shape,
                           dtype=dt,
                           initializer=init,
                           trainable=train)
+      self.vars[var_name] = v
+      return v
+    else:
+      v = tf.convert_to_tensor(init, name=var_name, dtype=dt)
+      v.get_shape().assert_is_compatible_with(shape)
       self.vars[var_name] = v
       return v
 
@@ -1868,10 +1883,5 @@ def _conversion_function(pt_wrapper, dtype=None, name=None, as_ref=False):
         (dtype, t.dtype, t))
   return t
 
-# TODO(eiderman): On next release remove this hack.
-try:
-  tf.register_tensor_conversion_function(
-      (PrettyTensor, Loss), _conversion_function, 100)
-except AttributeError:
-  tf.ops.register_tensor_conversion_function(
-      (PrettyTensor, Loss), _conversion_function, 100)
+tf.register_tensor_conversion_function(
+    (PrettyTensor, Loss), _conversion_function, 100)

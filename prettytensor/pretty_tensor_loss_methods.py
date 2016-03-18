@@ -33,12 +33,46 @@ class SoftmaxResult(
   pass
 
 
+class SampledSoftmaxResult(
+    collections.namedtuple('SoftmaxResult', ['logits', 'loss']),
+    prettytensor.PrettyTensorTupleMixin):
+  """Holds logits and a sampled cross entropy loss.
+
+  This also provides binding and construction if the result contains a template.
+  """
+  pass
+
+
 def _convert_and_assert_tensors_compatible(input_layer, target):
   target = tf.convert_to_tensor(target, dtype=input_layer.dtype)
   if not input_layer.get_shape().is_compatible_with(target.get_shape()):
     raise ValueError('target and input_layer are not compatible: %s != %s' %
                      (input_layer.get_shape(), target.get_shape()))
   return target
+
+
+def _convert_and_assert_per_example_weights_compatible(
+    input_layer, per_example_weights, dtype):
+  """Converts per_example_weights to a tensor and validates the shape."""
+  per_example_weights = tf.convert_to_tensor(
+      per_example_weights, name='per_example_weights', dtype=dtype)
+  if input_layer.get_shape().ndims:
+    expected_length = input_layer.get_shape().dims[0]
+    message = ('per_example_weights must have rank 1 and length %s, but was: %s'
+               % (expected_length, per_example_weights.get_shape()))
+  else:
+    expected_length = None
+    message = ('per_example_weights must have rank 1 and length equal to the '
+               'first dimension of inputs (unknown), but was: %s'
+               % per_example_weights.get_shape())
+
+  if per_example_weights.get_shape().ndims not in (1, None):
+    raise ValueError(message)
+
+  if not per_example_weights.get_shape().is_compatible_with((expected_length,)):
+    raise ValueError(message)
+
+  return per_example_weights
 
 
 def apply_regression(input_layer,
@@ -78,6 +112,10 @@ def apply_regression(input_layer,
   if loss_weight is not None:
     loss *= loss_weight
   if per_example_weights is not None:
+    per_example_weights = _convert_and_assert_per_example_weights_compatible(
+        input_layer,
+        per_example_weights,
+        dtype=loss.dtype)
     loss *= per_example_weights
   # Use mean so that the learning rate is independent of the batch size.
   if name is None:
@@ -156,6 +194,12 @@ def cross_entropy(input_layer,
   if labels is None:
     raise ValueError('Labels must be set')
   labels = _convert_and_assert_tensors_compatible(input_layer, labels)
+
+  if per_example_weights is not None:
+    per_example_weights = _convert_and_assert_per_example_weights_compatible(
+        input_layer,
+        per_example_weights,
+        dtype=input_layer.dtype)
 
   correct_predictions, examples = _compute_average_correct(
       input_layer, labels, per_example_weights)
@@ -236,6 +280,8 @@ def softmax_classifier_with_sampled_loss(inputs,
                                          remove_accidental_hits=True,
                                          loss_weight=None,
                                          per_example_weights=None,
+                                         weight_init=None,
+                                         bias_init=tf.zeros_initializer,
                                          name='softmax_classifier'):
   """Applies softmax and if labels is not None, then it adds a sampled loss.
 
@@ -275,59 +321,65 @@ def softmax_classifier_with_sampled_loss(inputs,
         True.
     loss_weight: A scalar multiplier for the loss.
     per_example_weights: A Tensor with a weight per example.
+    weight_init: The initializer for the weights (see `fully_connected`). Note:
+      This is the transpose of a normal fully_connected input layer!
+    bias_init: The initializer for the bias (see `fully_connected`).
     name: The optional name.
   Returns:
-    A tuple of the handle to softmax and a handle to the loss tensor.
+    A tuple of handles to the logits (fully connected layer) and loss.
   Raises:
     ValueError: If inputs or labels do not have the right shape.
   """
   # Compound ops need to respect sequential, so take a snapshot.
   input_copy = inputs.as_layer()
 
-  full = inputs.fully_connected(num_classes,
-                                activation_fn=None,
-                                name=name,
-                                transpose_weights=True)
-  if labels is not None:
-    labels = tf.convert_to_tensor(labels, dtype=tf.int64, name='labels')
-    labels.get_shape().assert_is_compatible_with([input_copy.get_shape()[0],
-                                                  num_true])
-    if num_true is None:
-      if labels.get_shape().ndims and labels.get_shape().dims[1]:
-        num_true = labels.get_shape().dims[1].value
-      else:
-        num_true = 1
+  with tf.name_scope('sampled_softmax'):
+    full = inputs.fully_connected(num_classes,
+                                  activation_fn=None,
+                                  name=name,
+                                  transpose_weights=True,
+                                  init=weight_init,
+                                  bias_init=bias_init)
+    if labels is not None:
+      labels = tf.convert_to_tensor(labels, dtype=tf.int64, name='labels')
+      labels.get_shape().assert_is_compatible_with([input_copy.get_shape()[0],
+                                                    num_true])
+      if num_true is None:
+        if labels.get_shape().ndims and labels.get_shape().dims[1]:
+          num_true = labels.get_shape().dims[1].value
+        else:
+          num_true = 1
 
-    def _loss(input_, labels, name=None):
-      return tf.nn.sampled_softmax_loss(
-          full.layer_parameters['weights'],
-          full.layer_parameters['bias'],
-          input_,
-          labels,
-          num_sampled=num_sampled,
-          num_classes=num_classes,
-          num_true=num_true,
-          sampled_values=sampled_values,
-          remove_accidental_hits=remove_accidental_hits,
-          name=name)
+      def _loss(input_, labels, name=None):
+        return tf.nn.sampled_softmax_loss(
+            full.layer_parameters['weights'],
+            full.layer_parameters['bias'],
+            input_,
+            labels,
+            num_sampled=num_sampled,
+            num_classes=num_classes,
+            num_true=num_true,
+            sampled_values=sampled_values,
+            remove_accidental_hits=remove_accidental_hits,
+            name=name)
 
-    loss = apply_regression(input_copy,
-                            _loss,
-                            labels,
-                            [],
-                            name='%s_sampled_loss' % name,
-                            loss_weight=loss_weight,
-                            per_example_weights=per_example_weights)
-  else:
-    loss = None
+      loss = apply_regression(input_copy,
+                              _loss,
+                              labels,
+                              [],
+                              name='%s_sampled_loss' % name,
+                              loss_weight=loss_weight,
+                              per_example_weights=per_example_weights)
+    else:
+      loss = None
 
-  return SoftmaxResult(full.softmax_activation(), loss)
+  return SampledSoftmaxResult(full, loss)
 
 
 @prettytensor.RegisterCompoundOp
 def softmax_classifier(
     input_layer, class_count, labels=None, name=PROVIDED, loss_weight=None,
-    per_example_weights=None):
+    per_example_weights=None, weight_init=None, bias_init=tf.zeros_initializer):
   """Creates a fully-connected linear layer followed by a softmax.
 
   Args:
@@ -338,12 +390,15 @@ def softmax_classifier(
     name: The optional name.
     loss_weight: A scalar multiplier for the loss.
     per_example_weights: A Tensor with a weight per example.
+    weight_init: The initializer for the weights (see `fully_connected`).
+    bias_init: The initializer for the bias (see `fully_connected`).
   Returns:
     A tuple of the softmax's name and the loss tensor's name in m.bits.
   Raises:
     ValueError: If the datatype is wrong.
   """
-  full = input_layer.fully_connected(class_count, activation_fn=None, name=name)
+  full = input_layer.fully_connected(class_count, activation_fn=None, name=name,
+                                     init=weight_init, bias_init=bias_init)
   return full.softmax(labels=labels,
                       loss_weight=loss_weight,
                       per_example_weights=per_example_weights,
@@ -447,7 +502,7 @@ def evaluate_precision_recall(input_layer,
                     selected/sum_relevant))
 
 
-@prettytensor.Register
+@prettytensor.Register(assign_defaults=('phase',))
 def evaluate_classifier(input_layer, labels, per_example_weights=None,
                         topk=1, name=PROVIDED, phase=Phase.train):
   """Calculates the total ratio of correct predictions across all examples seen.
@@ -507,14 +562,11 @@ def _compute_precision_recall(input_layer, labels, threshold,
   retrieved = tf.to_float(tf.greater(input_layer, threshold))
   selected = relevant * retrieved
 
-  if per_example_weights:
-    per_example_weights = tf.convert_to_tensor(per_example_weights,
-                                               name='per_example_weights')
-    if selected.get_shape().dims:
-      per_example_weights.get_shape().assert_is_compatible_with(
-          [selected.get_shape().dims[0]])
-    else:
-      per_example_weights.get_shape().assert_is_compatible_with([None])
+  if per_example_weights is not None:
+    per_example_weights = _convert_and_assert_per_example_weights_compatible(
+        input_layer,
+        per_example_weights,
+        dtype=None)
     per_example_weights = tf.to_float(tf.greater(per_example_weights, 0))
     selected = functions.reduce_batch_sum(selected) * per_example_weights
     relevant = functions.reduce_batch_sum(relevant) * per_example_weights
@@ -539,16 +591,11 @@ def _compute_average_correct(input_layer, labels, per_example_weights, topk=1):
   correct_predictions = tf.cast(in_topk, dtype)
 
   # If individual examples are weighted, then we want to normalize by that.
-  if per_example_weights:
-    per_example_weights = tf.convert_to_tensor(per_example_weights,
-                                               name='per_example_weights')
-    if ((input_layer.get_shape() and not per_example_weights.get_shape(
-    ).is_compatible_with([input_layer.get_shape().dims[0]])) or
-        per_example_weights.get_shape().ndims != 1):
-      raise ValueError(
-          'per_example_weights must be a vector of the same length as '
-          'labels: was %s but expected (%s,)' % (
-              per_example_weights.get_shape()), input_layer[0])
+  if per_example_weights is not None:
+    per_example_weights = _convert_and_assert_per_example_weights_compatible(
+        input_layer,
+        per_example_weights,
+        dtype=None)
     float_weights = tf.cast(per_example_weights, dtype)
     # TODO(eiderman): This should use an op that doesn't support broadcasting.
     correct_predictions *= float_weights

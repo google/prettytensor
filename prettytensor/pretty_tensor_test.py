@@ -282,6 +282,14 @@ class PrettyTensorTest(pretty_tensor_testing.PtTestCase):
     self.assertTrue(st.layer_parameters['weights'])
     self.assertTrue(st.layer_parameters['bias'])
 
+  def testFullWithWeightMatrix(self):
+    weights = numpy.array([[1., 0.], [0., 1.]])
+    in_ = numpy.array([[5., 6.]])
+    st = prettytensor.wrap(in_).fully_connected(
+        2, init=weights)
+    result = self.RunTensor(st)
+    testing.assert_allclose(in_, result, rtol=TOLERANCE)
+
   def testFullTranspose(self):
     st = self.input_layer.sequential()
     st.flatten()
@@ -299,6 +307,19 @@ class PrettyTensorTest(pretty_tensor_testing.PtTestCase):
     st.fully_connected(20)
     result = self.RunTensor(st)
     self.assertEqual(20, result.shape[1])
+
+  def testNoSummaries(self):
+    with prettytensor.defaults_scope(summary_collections=None):
+      input_layer = prettytensor.wrap(self.input_layer)
+
+      st = input_layer.sequential()
+      st.reshape([DIM_SAME, DIM_SAME, DIM_SAME, 1])
+      st.conv2d([3, 3], 10, tf.nn.relu)
+      st.flatten()
+      st.fully_connected(20)
+      st.softmax_classifier(2, labels=numpy.array([[1, 0], [0, 1]],
+                                                  dtype=numpy.float32))
+    self.assertEqual([], tf.get_collection(tf.GraphKeys.SUMMARIES))
 
   def testChainFull(self):
     chained = self.input_layer.flatten().fully_connected(

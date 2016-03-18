@@ -208,7 +208,7 @@ def unroll_state_saver(input_layer, name, state_shapes, template, lengths=None):
   if isinstance(state_saver, bookkeeper.SimpleStateSaver):
     for state_name, state_shape in zip(state_names, state_shapes):
       state_saver.AddState(state_name, input_layer.dtype, state_shape)
-  if lengths:
+  if lengths is not None:
     max_length = tf.reduce_max(lengths)
   else:
     max_length = None
@@ -224,7 +224,7 @@ def unroll_state_saver(input_layer, name, state_shapes, template, lengths=None):
   parameters = None
   for i, layer in enumerate(input_layer.sequence):
     with input_layer.g.name_scope('unroll_%00d' % i):
-      if i > 0 and max_length:
+      if i > 0 and max_length is not None:
         # TODO(eiderman): Right now the everything after length is undefined.
         # If we can efficiently propagate the last result to the end, then
         # models with only a final output would require a single softmax
@@ -465,8 +465,8 @@ class embedding_lookup(prettytensor.VarStoreMethod):
       embedding_count: Number of items in the embedding.
       embedding_shape: Shape of each embedding.
       name: The name of this layer.
-      init: tf.*Initializer to use for initializing the input.  Defaults to a
-        truncated normal.
+      init: tf.*Initializer to use for initializing the input or a Tensor.
+        Defaults to a truncated normal.
     Returns:
       input_layer
     Raises:

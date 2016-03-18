@@ -19,6 +19,7 @@ from __future__ import print_function
 
 import itertools
 import os.path
+import sys
 import time
 
 import six
@@ -54,9 +55,13 @@ class Runner(object):
     else:
       self._summary_writer = None
     self._create_initializers()
+    self._test_vars = None
 
   def _create_initializers(self):
     if self._var_count != len(tf.all_variables()):
+      save_dir = os.path.dirname(self._save_path) if self._save_path else None
+      if save_dir and not tf.gfile.IsDirectory(save_dir):
+        tf.gfile.MakeDirs(save_dir)
       self._saver = tf.train.Saver(tf.all_variables(), max_to_keep=5)
       self._init = tf.initialize_all_variables()
       self._check_inited = tf.assert_variables_initialized()
@@ -96,17 +101,17 @@ class Runner(object):
     """
     # Set list of not-yet-deleted checkpoints.
     if self._save_path:
-      ckpt = tf.train.get_checkpoint_state(os.path.dirname(self._save_path),
-                                           latest_filename)
+      ckpt = tf.train.get_checkpoint_state(
+          os.path.dirname(self._save_path), latest_filename)
       if ckpt and ckpt.all_model_checkpoint_paths:
         # Copy it because last_checkpoints is immutable.
+        # Manually configure a new Saver so that we get the latest snapshots.
         self._saver = tf.train.Saver(saver_def=self._saver.as_saver_def())
-        self._saver.set_last_checkpoints(list(
-            ckpt.all_model_checkpoint_paths))
+        self._saver.set_last_checkpoints(list(ckpt.all_model_checkpoint_paths))
     self._create_initializers()
     if self._saver.last_checkpoints:
       self._saver.restore(sess, self._saver.last_checkpoints[-1])
-      return True
+      return self._saver.last_checkpoints[-1]
     else:
       return False
 
@@ -114,6 +119,7 @@ class Runner(object):
     step = results[0]
     to_print = [x for x in results[1:] if x is not None]
     print('[%d] %s' % (step, to_print))
+    sys.stdout.flush()
     if self._save_path:
       self._saver.save(sess, self._save_path, step)
 
@@ -123,7 +129,8 @@ class Runner(object):
                 feed_vars=(),
                 feed_data=None,
                 print_every=100,
-                allow_initialize=True):
+                allow_initialize=True,
+                external_coordinator=None):
     """Runs `op_list` for `num_steps`.
 
     Args:
@@ -135,6 +142,9 @@ class Runner(object):
       print_every: Print a log line and checkpoing every so many steps.
       allow_initialize: If True, the model will be initialized if any variable
         is uninitialized, if False the model will not be initialized.
+      external_coordinator: If you are managing queuing threads outside of the
+        evaluation, then pass the external_coordinator to ensure that they are
+        properly coordinated.
     Returns:
       The final run result as a list.
     Raises:
@@ -147,8 +157,12 @@ class Runner(object):
 
     sess = tf.get_default_session()
     self._init_model(sess, allow_initialize)
-    coord = tf.train.Coordinator()
-    threads = tf.train.start_queue_runners(sess=sess, coord=coord)
+
+    if not external_coordinator:
+      coord = tf.train.Coordinator()
+      threads = tf.train.start_queue_runners(sess=sess, coord=coord)
+    else:
+      coord = external_coordinator
 
     try:
       for i, data in zip(xrange(num_steps), feed_data):
@@ -158,9 +172,12 @@ class Runner(object):
               'feed_data and feed_vars must be the same length: %d vs %d' % (
                   len(data), len(feed_vars)))
         if coord.should_stop():
+          print('Coordinator stopped')
+          sys.stdout.flush()
           break
         if len(feed_vars) != len(data):
           raise ValueError('Feed vars must be the same length as data.')
+
         if log_this_time and self._summary_writer:
           results = sess.run(ops + [self._summaries],
                              dict(zip(feed_vars, data)))
@@ -178,8 +195,12 @@ class Runner(object):
       print('Done training -- epoch limit reached')
     finally:
       # When done, ask the threads to stop.
-      coord.request_stop()
-    coord.join(threads)
+      if not external_coordinator:
+        coord.request_stop()
+        if threads:
+          # All the code in coordinator looks good, but it sometimes deadlocks.
+          time.sleep(1.0)
+          coord.join(threads)
 
     return results
 
@@ -189,7 +210,8 @@ class Runner(object):
                   num_steps,
                   feed_vars=(),
                   feed_data=None,
-                  print_every=100):
+                  print_every=100,
+                  external_coordinator=None):
     """Trains the given model.
 
     Args:
@@ -200,6 +222,9 @@ class Runner(object):
       feed_data: A generator that produces tuples of the same length as
         feed_vars.
       print_every: Print and save every so many steps.
+      external_coordinator: If you are managing queuing threads outside of the
+        evaluation, then pass the external_coordinator to ensure that they are
+        properly coordinated.
     Returns:
       `cost_to_log` from the final step.
     """
@@ -213,10 +238,25 @@ class Runner(object):
                           num_steps,
                           feed_vars=feed_vars,
                           feed_data=feed_data,
-                          print_every=print_every)[2:]
+                          print_every=print_every,
+                          external_coordinator=external_coordinator)[2:]
 
-  def evaluate_model(self, accuracy, num_steps, feed_vars=(), feed_data=None,
-                     summary_tag=None, print_every=0):
+  def _run_init_test_vars_op(self):
+    test_vars = tf.get_collection(bookkeeper.GraphKeys.TEST_VARIABLES)
+    if test_vars:
+      if test_vars != self._test_vars:
+        self._test_vars = list(test_vars)
+        self._test_var_init_op = tf.initialize_variables(test_vars)
+      return self._test_var_init_op.run()
+
+  def evaluate_model(self,
+                     accuracy,
+                     num_steps,
+                     feed_vars=(),
+                     feed_data=None,
+                     summary_tag=None,
+                     print_every=0,
+                     external_coordinator=None):
     """Evaluates the given model.
 
     Args:
@@ -228,18 +268,20 @@ class Runner(object):
       summary_tag: If provided, the final result of running the model will be
         published to this tag.
       print_every: Print a summary every so many steps, use 0 to disable.
+      external_coordinator: If you are managing queuing threads outside of the
+        evaluation, then pass the external_coordinator to ensure that they are
+        properly coordinated.
     Returns:
       The accuracy.
     """
-    test_vars = tf.get_collection(bookkeeper.GraphKeys.TEST_VARIABLES)
-    if test_vars:
-      tf.initialize_variables(test_vars).run()
+    self._run_init_test_vars_op()
     result = self.run_model([accuracy],
                             num_steps,
                             feed_vars=feed_vars,
                             feed_data=feed_data,
                             print_every=print_every,
-                            allow_initialize=False)
+                            allow_initialize=False,
+                            external_coordinator=external_coordinator)
     if summary_tag and self._summary_writer:
       summary = tf.Summary(
           value=[tf.Summary.Value(tag=summary_tag,
@@ -249,3 +291,71 @@ class Runner(object):
                        step=int(result[0]))
       self._summary_writer.add_event(event)
     return result[1]
+
+  def evaluate_repeatedly(self,
+                          accuracy,
+                          num_steps,
+                          feed_vars=(),
+                          feed_data=None,
+                          summary_tag=None,
+                          evaluation_times=-1):
+    """Runs the evaluation in a loop for `evaluation_times`.
+
+    On each iteration, `evaluate_model` is called with the supplied arguments.
+    This manages the queue threads itself.
+
+    Args:
+      accuracy: The metric that is being evaluated.
+      num_steps: The number of steps to run in the evaluator.
+      feed_vars: A list or tuple of the variables that will be fed.
+      feed_data: A generator that produces tuples of the same length as
+        feed_vars.
+      summary_tag: If provided, the final result of each evaluation will be
+        published to this tag.
+      evaluation_times: Run this loop for this many times or forever if it is
+        `-1`.
+    """
+    i = 0
+    sess = tf.get_default_session()
+
+    current_checkpoint = self.load_from_checkpoint(sess)
+    while not current_checkpoint:
+      print('Model not yet available, sleeping for 10 seconds %s.' %
+            os.path.dirname(self._save_path))
+      sys.stdout.flush()
+      time.sleep(10)
+      current_checkpoint = self.load_from_checkpoint(sess)
+
+    # Create relevant ops before starting queue runners.
+    self._run_init_test_vars_op()
+
+    coord = tf.train.Coordinator()
+    threads = tf.train.start_queue_runners(sess=sess, coord=coord)
+
+    try:
+      while i != evaluation_times:
+        i += 1
+        accuracy_result = self.evaluate_model(accuracy,
+                                              num_steps,
+                                              summary_tag=summary_tag,
+                                              print_every=0,
+                                              feed_vars=feed_vars,
+                                              feed_data=feed_data,
+                                              external_coordinator=coord)
+        print('[%d] %s %g' % (sess.run(bookkeeper.global_step()),
+                              summary_tag,
+                              accuracy_result))
+        while True:
+          next_checkpoint = self.load_from_checkpoint(sess)
+          if next_checkpoint == current_checkpoint:
+            time.sleep(10)
+          else:
+            break
+
+        current_checkpoint = next_checkpoint
+    finally:
+      print('Shutting down')
+      sys.stdout.flush()
+      coord.request_stop()
+      time.sleep(1.0)
+      coord.join(threads)

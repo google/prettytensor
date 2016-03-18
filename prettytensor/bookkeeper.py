@@ -108,6 +108,8 @@ class Bookkeeper(object):
   * g: The graph.
   * train_op: The training operation, if setup_training was called.
   * loss: A list of losses.
+  * summary_collections: Sets the default tag for all summaries created after
+    this point. Use `None` to disable summaries.
   """
 
   def __init__(self, g=None, default_device=None, global_step=None):  # pylint: disable=redefined-outer-name
@@ -137,8 +139,13 @@ class Bookkeeper(object):
       self.g._device_function_stack.append(default_device)
 
     self._recurrent_state = None
+    self.reset_summary_collections()
 
   # Exposed properties without setters.
+
+  def reset_summary_collections(self):
+    """Sets the summary collections to the default."""
+    self.summary_collections = [tf.GraphKeys.SUMMARIES]
 
   @property
   def update_ops(self):
@@ -227,6 +234,8 @@ class Bookkeeper(object):
 
   def add_scalar_summary(self, x, tag=None):
     """Adds a scalar summary for x."""
+    if not self.summary_collections:
+      return
     with self.g.as_default():
       if tag is None:
         tag = x.op.name
@@ -235,18 +244,22 @@ class Bookkeeper(object):
       summary = (
           tf.scalar_summary(
               tag, x,
-              name='%s_summary' % tag))
+              name='%s_summary' % tag,
+              collections=self.summary_collections))
       self.check_summary(tag)
       return summary
 
   def add_histogram_summary(self, tensor, tag=None):
     """Add a summary operation to visualize any tensor."""
+    if not self.summary_collections:
+      return
     with self.g.as_default():
       if tag is None:
         tag = tensor.op.name
       elif _NAME_SCOPE_SEP not in tag:
         tag = self.g.unique_name(tag)
-      summary = tf.histogram_summary(tag, tensor)
+      summary = tf.histogram_summary(tag, tensor,
+                                     collections=self.summary_collections)
       self.check_summary(tag)
       return summary
 
@@ -316,6 +329,8 @@ class Bookkeeper(object):
     Raises:
       ValueError: if decay is not in [0.9, 1).
     """
+    if not self.summary_collections:
+      return
     with self.g.as_default():
       if decay < 0.9 or decay >= 1.0:
         raise ValueError('Decay is %5.2f, but has to be in [0, 1).' % decay)
@@ -429,11 +444,7 @@ class SimpleStateSaver(object):
     self._states = {}
 
   def _as_shape_proto(self, shape):
-    # TODO(eiderman): On next release remove this hack.
-    try:
-      return tf.TensorShape(shape).as_proto()
-    except AttributeError:
-      return tf.tensor_util.MakeTensorShapeProto(shape)
+    return tf.TensorShape(shape).as_proto()
 
   def AddState(self, state_name, dtype, shape):
     """Adds a state to the state saver.
@@ -458,8 +469,15 @@ class SimpleStateSaver(object):
 
     # Add a constant tensor of zeros. At training time, this will initialize
     # the state with 0 - at inference time, this node is replaced by a feed.
-    feed_op = tf.zeros(dtype=dtype, shape=state_shape,
-                       name='%s_feed' % state_name)
+    try:
+      feed_op = tf.placeholder_with_default(
+          tf.zeros(dtype=dtype, shape=state_shape),
+          shape=shape, name='%s_feed' % state_name)
+    except AttributeError:
+      # TODO(eiderman): Remove this hack when placeholder_with_default hits a
+      # release.
+      feed_op = tf.zeros(dtype=dtype, shape=state_shape,
+                         name='%s_feed' % state_name)
     s = {'feed_op': feed_op,
          'feed_type': dtype,
          'feed_shape': shape_proto}

@@ -235,7 +235,7 @@ class diagonal_matrix_mul(prettytensor.VarStoreMethod):
 
     Args:
       input_layer: The input_layer.
-      init: An optional initialization. If not specified, uses Xavier
+      init: An optional initialization or Tensor. If not specified, uses Xavier
         initialization.
       stddev: A standard deviation to use in parameter initialization.
       l2loss: An l2 weight decay to apply.
@@ -272,7 +272,7 @@ class fully_connected(prettytensor.VarStoreMethod):
                init=None,
                stddev=None,
                bias=True,
-               bias_init=0.,
+               bias_init=tf.zeros_initializer,
                transpose_weights=False,
                name=PROVIDED):
     """Adds the parameters for a fully connected layer and returns a tensor.
@@ -291,7 +291,7 @@ class fully_connected(prettytensor.VarStoreMethod):
         initialization.
       stddev: A standard deviation to use in parameter initialization.
       bias: Set to False to not have a bias.
-      bias_init: The initial value for the bias.
+      bias_init: The initializer for the bias or a Tensor.
       transpose_weights: Flag indicating if weights should be transposed;
         this is useful for loading models with a different shape.
       name: The name for this operation is also used to create/find the
@@ -302,6 +302,8 @@ class fully_connected(prettytensor.VarStoreMethod):
       ValueError: if the head_shape is not rank 2  or the number of input nodes
       (second dim) is not known.
     """
+    # TODO(eiderman): bias_init shouldn't take a constant and stddev shouldn't
+    # exist.
     if input_layer.get_shape().ndims != 2:
       raise ValueError(
           'fully_connected requires a rank 2 Tensor with known second '
@@ -331,10 +333,12 @@ class fully_connected(prettytensor.VarStoreMethod):
     y = tf.matmul(input_layer, params, transpose_b=transpose_weights)
     layers.add_l2loss(books, params, l2loss)
     if bias:
+      if isinstance(bias_init, tf.compat.real_types):
+        bias_init = tf.constant_initializer(bias_init)
       y += self.variable(
           'bias',
           [size],
-          tf.constant_initializer(bias_init),
+          bias_init,
           dt=dtype)
 
     if activation_fn is not None:

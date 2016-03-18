@@ -17,6 +17,7 @@ import itertools
 import os
 import shutil
 import tempfile
+import threading
 import unittest
 
 
@@ -41,11 +42,7 @@ class LocalTrainerTest(unittest.TestCase):
       raise ValueError('This method only supports float32: %s' % dtype)
 
   def setUp(self):
-    # TODO(eiderman): On next release remove this hack.
-    try:
-      tf.reset_default_graph()
-    except AttributeError:
-      tf.ops.reset_default_graph()
+    tf.reset_default_graph()
     self.prng = numpy.random.RandomState(42)
 
     self.input = tf.placeholder(tf.float32, [4, 2])
@@ -182,6 +179,96 @@ class LocalTrainerTest(unittest.TestCase):
     runner = local_trainer.Runner(save_path=f, restore=False)
     with self.assertRaises(tf.errors.FailedPreconditionError):
       self.restore_helper(runner)
+
+  def test_queues(self):
+    qr = FakeQueueRunner()
+    tf.train.add_queue_runner(qr)
+    runner = local_trainer.Runner()
+    with tf.Session():
+      optimizer = tf.train.GradientDescentOptimizer(0.5)
+      train_op = pt.apply_optimizer(optimizer,
+                                    losses=[self.softmax_result.loss])
+
+      runner.train_model(train_op,
+                         self.softmax_result.loss,
+                         100,
+                         (self.input, self.target),
+                         self.xor_data,
+                         print_every=2)
+    qr.assert_worked(self)
+
+  def test_queue_error(self):
+    qr = FakeQueueRunner(RuntimeError('expected'))
+    tf.train.add_queue_runner(qr)
+    runner = local_trainer.Runner()
+    with tf.Session():
+      optimizer = tf.train.GradientDescentOptimizer(0.5)
+      train_op = pt.apply_optimizer(optimizer,
+                                    losses=[self.softmax_result.loss])
+
+      with self.assertRaisesRegexp(RuntimeError, 'expected'):
+        runner.train_model(train_op,
+                           self.softmax_result.loss,
+                           100,
+                           (self.input, self.target),
+                           self.xor_data,
+                           print_every=2)
+    qr.assert_worked(self)
+
+  def test_external_queues(self):
+    class NoCallQR(object):
+
+      def create_threads(self, *unused_args, **unused_kwargs):
+        assert False, 'Threads should not be started.'
+    tf.train.add_queue_runner(NoCallQR())
+
+    runner = local_trainer.Runner()
+    coord = tf.train.Coordinator()
+    with tf.Session():
+      optimizer = tf.train.GradientDescentOptimizer(0.5)
+      train_op = pt.apply_optimizer(optimizer,
+                                    losses=[self.softmax_result.loss])
+
+      runner.train_model(train_op,
+                         self.softmax_result.loss,
+                         10,
+                         (self.input, self.target),
+                         self.xor_data,
+                         print_every=2,
+                         external_coordinator=coord)
+
+
+class FakeQueueRunner(object):
+  called = 0
+  stopped = False
+
+  def __init__(self, error=None):
+    self.error = error
+
+  def create_threads(self, sess, coord=None, daemon=False, start=False):  # pylint: disable=unused-argument
+    self.called += 1
+    threads = [threading.Thread(target=self.set_stopped, args=(coord,))]
+    if self.error:
+      threads.append(threading.Thread(target=self.die,
+                                      args=(coord, self.error)))
+    if start:
+      for t in threads:
+        t.start()
+    return threads
+
+  def die(self, coord, error):
+    try:
+      raise error
+    except RuntimeError as e:
+      coord.request_stop(e)
+
+  def set_stopped(self, coord):
+    coord.wait_for_stop()
+    self.stopped = True
+
+  def assert_worked(self, test):
+    test.assertEqual(1, self.called)
+    test.assertTrue(self.stopped)
 
 if __name__ == '__main__':
   tf.test.main()

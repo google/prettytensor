@@ -374,7 +374,7 @@ A new PrettyTensor.
 
 - - -
 
-## conv2d(kernel, depth, activation_fn=None, stride=None, l2loss=None, init=None, stddev=None, bias=True, edges=SAME, batch_normalize=False, name=None) {#conv2d}
+## conv2d(kernel, depth, activation_fn=None, stride=None, l2loss=None, init=None, stddev=None, bias=True, bias_init=<function zeros_initializer at 0x2b7dc08>, edges=SAME, batch_normalize=False, name=None) {#conv2d}
 
 
 
@@ -399,6 +399,7 @@ The current head must be a rank 4 Tensor.
  initialization.
 * stddev: A standard deviation to use in parameter initialization.
 * bias: Set to False to not have a bias.
+* bias_init: An initializer for the bias or a Tensor.
 * edges: Either SAME to use 0s for the out of bounds area or VALID to shrink
  the output size and only uses valid input pixels.
 * batch_normalize: Set to True to batch_normalize this layer.
@@ -458,7 +459,7 @@ This creates the parameter vector.
 #### Args:
 
 
-* init: An optional initialization. If not specified, uses Xavier
+* init: An optional initialization or Tensor. If not specified, uses Xavier
  initialization.
 * stddev: A standard deviation to use in parameter initialization.
 * l2loss: An l2 weight decay to apply.
@@ -513,8 +514,8 @@ lookup is id % embedding_count
 * embedding_count: Number of items in the embedding.
 * embedding_shape: Shape of each embedding.
 * name: The name of this layer.
-* init: tf.*Initializer to use for initializing the input. Defaults to a
- truncated normal.
+* init: tf.*Initializer to use for initializing the input or a Tensor.
+ Defaults to a truncated normal.
 
 #### Returns:
 
@@ -643,7 +644,7 @@ A LayerWrapper with the flattened tensor.
 
 - - -
 
-## fully_connected(size, activation_fn=None, l2loss=None, init=None, stddev=None, bias=True, bias_init=0.0, transpose_weights=False, name=None) {#fully_connected}
+## fully_connected(size, activation_fn=None, l2loss=None, init=None, stddev=None, bias=True, bias_init=<function zeros_initializer at 0x2b7dc08>, transpose_weights=False, name=None) {#fully_connected}
 
 
 
@@ -664,7 +665,7 @@ The current head must be a rank 2 Tensor.
  initialization.
 * stddev: A standard deviation to use in parameter initialization.
 * bias: Set to False to not have a bias.
-* bias_init: The initial value for the bias.
+* bias_init: The initializer for the bias or a Tensor.
 * transpose_weights: Flag indicating if weights should be transposed;
  this is useful for loading models with a different shape.
 * name: The name for this operation is also used to create/find the
@@ -1089,7 +1090,7 @@ Computes the softmax.
 
 - - -
 
-## softmax_classifier(class_count, labels=None, name=None, loss_weight=None, per_example_weights=None) {#softmax_classifier}
+## softmax_classifier(class_count, labels=None, name=None, loss_weight=None, per_example_weights=None, weight_init=None, bias_init=<function zeros_initializer at 0x2b7dc08>) {#softmax_classifier}
 
 
 
@@ -1104,6 +1105,8 @@ Creates a fully-connected linear layer followed by a softmax.
 * name: The optional name.
 * loss_weight: A scalar multiplier for the loss.
 * per_example_weights: A Tensor with a weight per example.
+* weight_init: The initializer for the weights (see `fully_connected`).
+* bias_init: The initializer for the bias (see `fully_connected`).
 
 #### Returns:
 
@@ -1118,7 +1121,7 @@ A tuple of the softmax's name and the loss tensor's name in m.bits.
 
 - - -
 
-## softmax_classifier_with_sampled_loss(num_classes, labels, num_sampled, num_true=None, sampled_values=None, remove_accidental_hits=True, loss_weight=None, per_example_weights=None, name=softmax_classifier) {#softmax_classifier_with_sampled_loss}
+## softmax_classifier_with_sampled_loss(num_classes, labels, num_sampled, num_true=None, sampled_values=None, remove_accidental_hits=True, loss_weight=None, per_example_weights=None, weight_init=None, bias_init=<function zeros_initializer at 0x2b7dc08>, name=softmax_classifier) {#softmax_classifier_with_sampled_loss}
 
 
 
@@ -1161,11 +1164,14 @@ optimizes a transpose by pushing it down to the `fully_connected` layer.
 * True.
  loss_weight: A scalar multiplier for the loss.
  per_example_weights: A Tensor with a weight per example.
+ weight_init: The initializer for the weights (see `fully_connected`). Note:
+ This is the transpose of a normal fully_connected input layer!
+ bias_init: The initializer for the bias (see `fully_connected`).
  name: The optional name.
 
 #### Returns:
 
-A tuple of the handle to softmax and a handle to the loss tensor.
+A tuple of handles to the logits (fully connected layer) and loss.
 
 
 #### Raises:
@@ -1359,6 +1365,7 @@ Many Pretty Tensor methods support setting defaults. The supported defaults and 
 * `phase`:
     * [batch_normalize](PrettyTensor.md#batch_normalize)
     * [evaluate_precision_recall](PrettyTensor.md#evaluate_precision_recall)
+    * [evaluate_classifier](PrettyTensor.md#evaluate_classifier)
     * [dropout](PrettyTensor.md#dropout)
 
 * `scale_after_normalization`:

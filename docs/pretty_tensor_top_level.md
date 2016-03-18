@@ -248,7 +248,7 @@ thrown.
 * var_name: The unique name of this variable. If a variable with the same
  name exists, then it is returned.
 * shape: The shape of the variable.
-* init: The init function to use.
+* init: The init function to use or a Tensor to copy.
 * dt: The datatype, defaults to float. This will automatically extract the
  base dtype.
 * train: Whether or not the variable should be trained.
@@ -442,6 +442,7 @@ Many Pretty Tensor methods support setting defaults. The supported defaults and 
 * `phase`:
     * [batch_normalize](PrettyTensor.md#batch_normalize)
     * [evaluate_precision_recall](PrettyTensor.md#evaluate_precision_recall)
+    * [evaluate_classifier](PrettyTensor.md#evaluate_classifier)
     * [dropout](PrettyTensor.md#dropout)
 
 * `scale_after_normalization`:
@@ -629,10 +630,6 @@ A layer.
 
 
 ## Extensions
-
-
-
-### [recurrent_networks](recurrent_networks.md)
 
 
 

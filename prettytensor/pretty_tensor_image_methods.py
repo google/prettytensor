@@ -173,6 +173,7 @@ class conv2d(prettytensor.VarStoreMethod):
                init=None,
                stddev=None,
                bias=True,
+               bias_init=tf.zeros_initializer,
                edges=PAD_SAME,
                batch_normalize=False,
                name=PROVIDED):
@@ -196,6 +197,7 @@ class conv2d(prettytensor.VarStoreMethod):
         initialization.
       stddev: A standard deviation to use in parameter initialization.
       bias: Set to False to not have a bias.
+      bias_init: An initializer for the bias or a Tensor.
       edges: Either SAME to use 0s for the out of bounds area or VALID to shrink
         the output size and only uses valid input pixels.
       batch_normalize: Set to True to batch_normalize this layer.
@@ -235,7 +237,7 @@ class conv2d(prettytensor.VarStoreMethod):
       y += self.variable(
           'bias',
           [size[-1]],
-          tf.zeros_initializer,
+          bias_init,
           dt=dtype)
     books.add_scalar_summary(
         tf.reduce_mean(

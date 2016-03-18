@@ -197,7 +197,11 @@ def main(_=None):
 
   # Create an inference model so that we can sample.  The big difference is
   # that the input is a single character and it requires reset nodes.
-  with tf.variable_scope('shakespeare', reuse=True):
+  # Also place summaries in a different collection. The default summaries have
+  # dependencies on running the graph and would introduce a dependence on the
+  # inference placeholder.
+  with tf.variable_scope('shakespeare', reuse=True), pt.defaults_scope(
+      summary_collections=['INFERENCE_SUMMARIES']):
     inference_input = tf.placeholder(tf.int32, [])
     # Needs to be 2 dimensional so that it matches the dims of the other models.
     reshaped = pt.wrap(inference_input).reshape([1, 1])
