@@ -374,7 +374,7 @@ A new PrettyTensor.
 
 - - -
 
-## conv2d(kernel, depth, activation_fn=None, stride=None, l2loss=None, init=None, stddev=None, bias=True, bias_init=<function zeros_initializer at 0x2b7dc08>, edges=SAME, batch_normalize=False, name=None) {#conv2d}
+## conv2d(kernel, depth, activation_fn=None, stride=None, l2loss=None, init=None, stddev=None, bias=True, bias_init=<function zeros_initializer at 0x382b500>, edges=SAME, batch_normalize=False, name=None) {#conv2d}
 
 
 
@@ -644,7 +644,7 @@ A LayerWrapper with the flattened tensor.
 
 - - -
 
-## fully_connected(size, activation_fn=None, l2loss=None, init=None, stddev=None, bias=True, bias_init=<function zeros_initializer at 0x2b7dc08>, transpose_weights=False, name=None) {#fully_connected}
+## fully_connected(size, activation_fn=None, l2loss=None, init=None, stddev=None, bias=True, bias_init=<function zeros_initializer at 0x382b500>, transpose_weights=False, name=None) {#fully_connected}
 
 
 
@@ -842,6 +842,10 @@ template.
 A new sequence Pretty Tensor.
 
 
+#### Raises:
+
+
+* ValueError: If the input_layer does not hold a sequence.
 
 
 - - -
@@ -1090,7 +1094,7 @@ Computes the softmax.
 
 - - -
 
-## softmax_classifier(class_count, labels=None, name=None, loss_weight=None, per_example_weights=None, weight_init=None, bias_init=<function zeros_initializer at 0x2b7dc08>) {#softmax_classifier}
+## softmax_classifier(class_count, labels=None, name=None, loss_weight=None, per_example_weights=None, weight_init=None, bias_init=<function zeros_initializer at 0x382b500>) {#softmax_classifier}
 
 
 
@@ -1121,7 +1125,7 @@ A tuple of the softmax's name and the loss tensor's name in m.bits.
 
 - - -
 
-## softmax_classifier_with_sampled_loss(num_classes, labels, num_sampled, num_true=None, sampled_values=None, remove_accidental_hits=True, loss_weight=None, per_example_weights=None, weight_init=None, bias_init=<function zeros_initializer at 0x2b7dc08>, name=softmax_classifier) {#softmax_classifier_with_sampled_loss}
+## softmax_classifier_with_sampled_loss(num_classes, labels, num_sampled, num_true=None, sampled_values=None, remove_accidental_hits=True, loss_weight=None, per_example_weights=None, weight_init=None, bias_init=<function zeros_initializer at 0x382b500>, name=softmax_classifier) {#softmax_classifier_with_sampled_loss}
 
 
 

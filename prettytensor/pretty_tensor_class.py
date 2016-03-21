@@ -50,7 +50,9 @@ PAD_VALID = 'VALID'
 PROVIDED = None
 
 # Maintain a list of valid defaults so they can be validated.
-_valid_defaults = {'summary_collections'}
+_valid_defaults = {'summary_collections',
+                   'trainable_variables',
+                   'variable_collections'}
 _defaults = {}
 
 # A constant used to disambiguate None from unspecified in a couple of optional
@@ -111,12 +113,14 @@ def wrap(tensor, books=None, tensor_shape=None):
   if isinstance(tensor, PrettyTensor):
     return tensor.as_layer()
   elif isinstance(tensor, UnboundVariable):
+
     def set_input_from_unbound_var(data):
       """Sets the input from the given unbound_var."""
       if data is not None:
         return wrap(data, books)
       else:
         return None
+
     return _DeferredLayer(books, set_input_from_unbound_var, [tensor], {})
   else:
     tensor = tf.convert_to_tensor(tensor, name='input')
@@ -174,21 +178,40 @@ def wrap_sequence(sequence, books=None, tensor_shape=None):
   return Layer(books, sequence=sequence, name=sequence[0].name)
 
 
+def _assert_value_not_string(name, kwargs):
+  if isinstance(kwargs.get(name, None), six.string_types):
+    raise ValueError('%s cannot be a string, must be a tuple or list.' % name)
+
+
 @contextlib.contextmanager
 def defaults_scope(**kwargs):
   """Creates a scope for the defaults that are used in a `with` block.
 
+  In addition to setting defaults for some methods, this also can control:
+
+  * `summary_collections`: Choose which collection to place summaries in or
+      disable with `None`.
+  * `trainable_variables`: Boolean indicating if variables are trainable.
+  * `variable_collections`: Default collections in which to place variables;
+      `tf.GraphKeys.VARIABLES` is always included.
+
   Args:
-    **kwargs: The defaults.
+    **kwargs: The defaults.Cloned from CL 117475959 by 'g4 patch'.
   Yields:
     Doesn't really yield, instead this creates a Context Manager for use in a
     `with` statement.
+  Raises:
+    ValueError: if a collection type is accidently supplied a string.
   """
+  _assert_value_not_string('summary_collections', kwargs)
+  _assert_value_not_string('variable_collections', kwargs)
+
   _check_defaults(kwargs)
   global _defaults
   old_defaults = _defaults
   _defaults = chain_dict.ChainDict(_defaults)
   _defaults.update(kwargs)
+
   # Special logic to support summary_collections.
   # This is added here because introducing more scopes would add more confusion
   # than overloading this one a bit.
@@ -197,9 +220,10 @@ def defaults_scope(**kwargs):
     books.summary_collections = _defaults['summary_collections']
   else:
     books.reset_summary_collections()
-
-  yield _defaults
-  _defaults = old_defaults
+  try:
+    yield _defaults
+  finally:
+    _defaults = old_defaults
 
 
 def supported_defaults():
@@ -257,8 +281,8 @@ def _merge_unbound_var_dicts(src, dst):
     if dst.get(k, v) != v:
       trace1 = ''.join(scopes.skip_common_stack_elements(v.stacktrace, dst[
           k].stacktrace))
-      trace2 = ''.join(scopes.skip_common_stack_elements(dst[k].stacktrace,
-                                                         v.stacktrace))
+      trace2 = ''.join(
+          scopes.skip_common_stack_elements(dst[k].stacktrace, v.stacktrace))
       raise ValueError('Key conflict: %s\nDefined At:\n%s\nand\n%s' %
                        (k, trace1, trace2))
     else:
@@ -409,6 +433,7 @@ class PrettyTensorTupleMixin(object):
     for arg in binding_order:
       if arg not in self.unbound_vars:
         raise ValueError('Unknown binding: %s' % arg)
+
     def func(*args, **kwargs):
       """Constructs a template."""
       if len(binding_order) != len(args):
@@ -416,6 +441,7 @@ class PrettyTensorTupleMixin(object):
       values = dict(zip(binding_order, args))
       values.update(kwargs)
       return self.construct(**values)
+
     func.__doc__ = _gen_ipython_string(func, binding_order, [], func.__doc__)
     return func
 
@@ -471,8 +497,8 @@ class Loss(object):
   def mark_as_required(self):
     """Adds this loss to the MARKED_LOSSES collection."""
     if not self._marked:
-      self._loss.graph.add_to_collection(
-          bookkeeper.GraphKeys.MARKED_LOSSES, self._loss)
+      self._loss.graph.add_to_collection(bookkeeper.GraphKeys.MARKED_LOSSES,
+                                         self._loss)
       self._marked = True
 
   def is_sequence(self):
@@ -810,79 +836,82 @@ class PrettyTensor(object):
   __array_priority__ = 100
 
   def __add__(self, other):
-    return self.apply(operator.add, other)
+    return self._map_or_apply(operator.add, other, name='apply_op')
 
   def __radd__(self, other):
-    return self._rapply(operator.add, other)
+    return self._map_or_apply(operator.add, other, right_=True, name='apply_op')
 
   def __sub__(self, other):
-    return self.apply(operator.sub, other)
+    return self._map_or_apply(operator.sub, other, name='apply_op')
 
   def __rsub__(self, other):
-    return self._rapply(operator.sub, other)
+    return self._map_or_apply(operator.sub, other, right_=True, name='apply_op')
 
   def __mul__(self, other):
-    return self.apply(operator.mul, other)
+    return self._map_or_apply(operator.mul, other, name='apply_op')
 
   def __rmul__(self, other):
-    return self._rapply(operator.mul, other)
+    return self._map_or_apply(operator.mul, other, right_=True, name='apply_op')
 
   def __div__(self, other):
-    return self.apply(operator.div, other)
+    return self._map_or_apply(operator.div, other, name='apply_op')
 
   def __rdiv__(self, other):
-    return self._rapply(operator.div, other)
+    return self._map_or_apply(operator.div, other, right_=True, name='apply_op')
 
   def __truediv__(self, other):
-    return self.apply(operator.truediv, other)
+    return self._map_or_apply(operator.truediv, other, name='apply_op')
 
   def __rtruediv__(self, other):
-    return self._rapply(operator.truediv, other)
+    return self._map_or_apply(
+        operator.truediv, other, right_=True, name='apply_op')
 
   def __mod__(self, other):
-    return self.apply(operator.mod, other)
+    return self._map_or_apply(operator.mod, other, name='apply_op')
 
   def __rmod__(self, other):
-    return self._rapply(operator.mod, other)
+    return self._map_or_apply(operator.mod, other, right_=True, name='apply_op')
 
   def __lt__(self, other):
-    return self.apply(operator.lt, other)
+    return self._map_or_apply(operator.lt, other, name='apply_op')
 
   def __le__(self, other):
-    return self.apply(operator.le, other)
+    return self._map_or_apply(operator.le, other, name='apply_op')
 
   def __gt__(self, other):
-    return self.apply(operator.gt, other)
+    return self._map_or_apply(operator.gt, other, name='apply_op')
 
   def __ge__(self, other):
-    return self.apply(operator.and_, other)
+    return self._map_or_apply(operator.and_, other, name='apply_op')
 
   def __and__(self, other):
-    return self.apply(operator.and_, other)
+    return self._map_or_apply(operator.and_, other, name='apply_op')
 
   def __rand__(self, other):
-    return self._rapply(operator.and_, other)
+    return self._map_or_apply(
+        operator.and_, other, right_=True, name='apply_op')
 
   def __or__(self, other):
-    return self.apply(operator.or_, other)
+    return self._map_or_apply(operator.or_, other, name='apply_op')
 
   def __ror__(self, other):
-    return self._rapply(operator.ror_, other)
+    return self._map_or_apply(
+        operator.ror_, other, right_=True, name='apply_op')
 
   def __xor__(self, other):
-    return self.apply(operator.xor, other)
+    return self._map_or_apply(operator.xor, other, name='apply_op')
 
   def __rxor__(self, other):
-    return self._rapply(operator.xor, other)
+    return self._map_or_apply(operator.xor, other, right_=True, name='apply_op')
 
   def __invert__(self):
-    return self.apply(operator.invert)
+    return self._map_or_apply(operator.invert, name='apply_op')
 
   def __neg__(self):
-    return self.apply(operator.neg)
+    return self._map_or_apply(operator.neg, name='apply_op')
 
   def __abs__(self):
-    return self.apply(operator.abs)
+    return self._map_or_apply(operator.abs, name='apply_op')
 
   def __len__(self):
     if self.is_sequence():
@@ -901,7 +930,7 @@ class PrettyTensor(object):
       for i in xrange(len(self.sequence)):
         yield self[i]
     else:
-      raise ValueError('Internal tensor does not support iteration.')
+      raise ValueError('Can only iterate on a sequence and not a Tensor.')
 
 
 class Layer(PrettyTensor):
@@ -910,15 +939,14 @@ class Layer(PrettyTensor):
   Everytime a method is called that creates a tensor, a new Layer is returned.
   """
 
-  def __init__(
-      self,
-      books=None,
-      copy=None,
-      name=None,
-      tensor=None,
-      sequence=None,
-      scope=_unspecified,
-      defaults=None):
+  def __init__(self,
+               books=None,
+               copy=None,
+               name=None,
+               tensor=None,
+               sequence=None,
+               scope=_unspecified,
+               defaults=None):
     """Creates a PrettyTensor object.
 
     Args:
@@ -959,8 +987,8 @@ class Layer(PrettyTensor):
         self._name = self._sequence[0].op.name
     else:
       self._name = name
-    if (self.bookkeeper is None
-        or (self._sequence is None == self._tensor is None)):
+    if (self.bookkeeper is None or
+        (self._sequence is None == self._tensor is None)):
       raise ValueError('Not completely specified: %s %s %s' %
                        (self.bookkeeper, self._sequence, self._tensor))
     self._layer_parameters = {}
@@ -999,8 +1027,8 @@ class Layer(PrettyTensor):
     # This is very forgiving since there are quite a few types that act like
     # tensors.
     if isinstance(tensor, collections.Sequence):
-      raise ValueError('Attempting to use a sequence as a tensor %s.'
-                       % (tensor,))
+      raise ValueError('Attempting to use a sequence as a tensor %s.' %
+                       (tensor,))
     layer = Layer(copy=self, tensor=unwrap(tensor), sequence=None)
     if parameters:
       layer.layer_parameters.update(parameters)
@@ -1057,16 +1085,15 @@ class UnboundVariable(object):
 class _DeferredLayer(PrettyTensor):
   """Defines a template by encapsulating a deferred construction function."""
 
-  def __init__(
-      self,
-      books,
-      method,
-      method_args,
-      method_kwargs,
-      defaults=None,
-      scope=None,
-      pass_through=None,
-      partial_context=None):
+  def __init__(self,
+               books,
+               method,
+               method_args,
+               method_kwargs,
+               defaults=None,
+               scope=None,
+               pass_through=None,
+               partial_context=None):
     """Creates a _DeferredLayer.
 
     This searches all of method_args and method_kwargs (and any sublists or
@@ -1236,6 +1263,7 @@ class _DeferredLayer(PrettyTensor):
     for arg in binding_order:
       if arg not in self._unbound_vars:
         raise ValueError('Unknown binding: %s' % arg)
+
     def func(*args, **kwargs):
       """Constructs a template."""
       if len(binding_order) != len(args):
@@ -1243,6 +1271,7 @@ class _DeferredLayer(PrettyTensor):
       values = dict(zip(binding_order, args))
       values.update(kwargs)
       return self.construct(**values)
+
     func.__doc__ = _gen_ipython_string(func, binding_order, [], func.__doc__)
     return func
 
@@ -1344,8 +1373,8 @@ def _strip_unnecessary_contents_from_stack(result, processed):
   trace = []
   found = False
   for f, line_no, method, _ in result._traceback:
-    if (method in ('_replace_deferred', '_construct')
-        and f.endswith('pretty_tensor_class.py')):
+    if (method in ('_replace_deferred', '_construct') and
+        f.endswith('pretty_tensor_class.py')):
       found = True
       continue
     trace.append((f, line_no, method, {}))
@@ -1493,6 +1522,118 @@ class SequentialLayerBuilder(PrettyTensor):
     """
     return self._head
 
+  # Make ops side effect free; as_layer takes a snapshot and thus removes the
+  # side effects.
+  def __add__(self, other):
+    return PrettyTensor.__add__(self.as_layer(), other)
+
+  def __radd__(self, other):
+    return PrettyTensor.__radd__(self.as_layer(), other)
+
+  def __sub__(self, other):
+    return PrettyTensor.__sub__(self.as_layer(), other)
+
+  def __rsub__(self, other):
+    return PrettyTensor.__rsub__(self.as_layer(), other)
+
+  def __mul__(self, other):
+    return PrettyTensor.__mul__(self.as_layer(), other)
+
+  def __rmul__(self, other):
+    return PrettyTensor.__rmul__(self.as_layer(), other)
+
+  def __div__(self, other):
+    return PrettyTensor.__rdiv__(self.as_layer(), other)
+
+  def __rdiv__(self, other):
+    return PrettyTensor.__rdiv__(self.as_layer(), other)
+
+  def __truediv__(self, other):
+    return PrettyTensor.__truediv__(self.as_layer(), other)
+
+  def __rtruediv__(self, other):
+    return PrettyTensor.__rtruediv__(self.as_layer(), other)
+
+  def __mod__(self, other):
+    return PrettyTensor.__mod__(self.as_layer(), other)
+
+  def __rmod__(self, other):
+    return PrettyTensor.__rmod__(self.as_layer(), other)
+
+  def __lt__(self, other):
+    return PrettyTensor.__lt__(self.as_layer(), other)
+
+  def __le__(self, other):
+    return PrettyTensor.__le__(self.as_layer(), other)
+
+  def __gt__(self, other):
+    return PrettyTensor.__gt__(self.as_layer(), other)
+
+  def __ge__(self, other):
+    return PrettyTensor.__ge__(self.as_layer(), other)
+
+  def __and__(self, other):
+    return PrettyTensor.__and__(self.as_layer(), other)
+
+  def __rand__(self, other):
+    return PrettyTensor.__rand__(self.as_layer(), other)
+
+  def __or__(self, other):
+    return PrettyTensor.__or__(self.as_layer(), other)
+
+  def __ror__(self, other):
+    return PrettyTensor.__ror__(self.as_layer(), other)
+
+  def __xor__(self, other):
+    return PrettyTensor.__xor__(self.as_layer(), other)
+
+  def __rxor__(self, other):
+    return PrettyTensor.__rxor__(self.as_layer(), other)
+
+  def __invert__(self):
+    return PrettyTensor.__invert__(self.as_layer())
+
+  def __neg__(self):
+    return PrettyTensor.__neg__(self.as_layer())
+
+  def __abs__(self):
+    return PrettyTensor.__abs__(self.as_layer())
+
+  # Side effecty incremental ops (e.g. +=)
+
+  def __iadd__(self, other):
+    return PrettyTensor.__add__(self, other)
+
+  def __isub__(self, other):
+    return PrettyTensor.__sub__(self, other)
+
+  def __imul__(self, other):
+    return PrettyTensor.__mul__(self, other)
+
+  def __idiv__(self, other):
+    return PrettyTensor.__div__(self, other)
+
+  def __itruediv__(self, other):
+    return PrettyTensor.__truediv__(self, other)
+
+  def __ifloordiv__(self, other):
+    return PrettyTensor.__floordiv__(self, other)
+
+  def __imod__(self, other):
+    return PrettyTensor.__mod__(self, other)
+
+  def __ipow__(self, other):
+    return PrettyTensor.__pow__(self, other)
+
+  def __iand__(self, other):
+    return PrettyTensor.__and__(self, other)
+
+  def __ior__(self, other):
+    return PrettyTensor.__or__(self, other)
+
+  def __ixor__(self, other):
+    return PrettyTensor.__xor__(self, other)
+
 
 class VarStoreMethod(object):
   """Convenience base class for registered methods that create variables.
@@ -1504,7 +1645,7 @@ class VarStoreMethod(object):
   def __init__(self):
     self.vars = {}
 
-  def variable(self, var_name, shape, init, dt=tf.float32, train=True):
+  def variable(self, var_name, shape, init, dt=tf.float32, train=None):
     """Adds a named variable to this bookkeeper or returns an existing one.
 
     Variables marked train are returned by the training_variables method. If
@@ -1519,7 +1660,8 @@ class VarStoreMethod(object):
       init: The init function to use or a Tensor to copy.
       dt: The datatype, defaults to float.  This will automatically extract the
         base dtype.
-      train: Whether or not the variable should be trained.
+      train: Whether or not the variable should be trained; defaults to
+        True unless a default_scope has overridden it.
     Returns:
       A TensorFlow tensor.
     Raises:
@@ -1537,12 +1679,19 @@ class VarStoreMethod(object):
             'incompatible values within a graph.' % (v.get_shape(), shape))
       return v
     elif callable(init):
+      if train is None:
+        train = _defaults.get('trainable_variables', True)
+      variable_collections = _defaults.get('variable_collections', ())
+      if tf.GraphKeys.VARIABLES not in variable_collections:
+        variable_collections = list(variable_collections) + [
+            tf.GraphKeys.VARIABLES]
 
       v = tf.get_variable(var_name,
                           shape=shape,
                           dtype=dt,
                           initializer=init,
-                          trainable=train)
+                          trainable=train,
+                          collections=variable_collections)
       self.vars[var_name] = v
       return v
     else:
@@ -1669,8 +1818,8 @@ class _RegisterBase(object):
       default_func = PrettyTensor.with_defaults.__func__
     else:
       default_func = PrettyTensor.with_defaults
-    _set_ipython_string(default_func, default_args,
-                        default_values, _original_set_defaults_doc)
+    _set_ipython_string(default_func, default_args, default_values,
+                        _original_set_defaults_doc)
     _set_ipython_string(defaults_scope, default_args, default_values,
                         _original_defaults_scope_doc)
 
@@ -1686,8 +1835,8 @@ class _RegisterBase(object):
 
   def fill_kwargs(self, input_layer, kwargs):
     """Applies name_suffix and defaults to kwargs and returns the result."""
-    return input_layer._replace_args_with_defaults(
-        _args=self._assign_defaults, **kwargs)
+    return input_layer._replace_args_with_defaults(_args=self._assign_defaults,
+                                                   **kwargs)
 
   def __call__(self, obj):
     if inspect.isclass(obj):
@@ -1712,8 +1861,8 @@ class _RegisterBase(object):
     self._has_name_param = 'name' in argspec.args
     if not self._overwrite:
       assert not hasattr(Layer, name), 'Method already defined: %s' % name
-      assert not hasattr(
-          SequentialLayerBuilder, name), 'Clash with Sequential: %s' % name
+      assert not hasattr(SequentialLayerBuilder,
+                         name), 'Clash with Sequential: %s' % name
 
     setattr(PrettyTensor, name, method)
 
@@ -1882,6 +2031,7 @@ def _conversion_function(pt_wrapper, dtype=None, name=None, as_ref=False):
         'Tensor conversion requested dtype %s for Tensor with dtype %s: %r' %
         (dtype, t.dtype, t))
   return t
+
 
 tf.register_tensor_conversion_function(
     (PrettyTensor, Loss), _conversion_function, 100)

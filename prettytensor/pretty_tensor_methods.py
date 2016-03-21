@@ -14,6 +14,7 @@ from __future__ import division
 from __future__ import print_function
 
 import collections
+import itertools
 
 import tensorflow as tf
 
@@ -579,6 +580,21 @@ def squeeze(input_layer, squeeze_dims=None):
   return tf.squeeze(input_layer, squeeze_dims)
 
 
+def _zip_with_scalars(args):
+  """Zips across args in order and replaces non-iterables with repeats."""
+  zipped = []
+  for arg in args:
+    if isinstance(arg, prettytensor.PrettyTensor):
+      zipped.append(arg if arg.is_sequence() else itertools.repeat(arg))
+    elif (isinstance(arg, collections.Sequence) and
+          not isinstance(arg, tf.compat.bytes_or_text_types)):
+      zipped.append(arg)
+    else:
+      zipped.append(itertools.repeat(arg))
+  assert len(args) == len(zipped)
+  return zip(*zipped)
+
+
 @prettytensor.Register(method_name='map')
 def map_(input_layer, fn):
   """Maps the given function across this sequence.
@@ -591,5 +607,52 @@ def map_(input_layer, fn):
     fn: A function of 1 argument that is applied to each item in the sequence.
   Returns:
     A new sequence Pretty Tensor.
+  Raises:
+    ValueError: If the input_layer does not hold a sequence.
   """
-  return prettytensor.wrap_sequence([fn(x) for x in input_layer])
+  if not input_layer.is_sequence():
+    raise ValueError('Can only map a sequence.')
+  return [fn(x) for x in input_layer]
+
+
+# Note: This is a private method.
+@prettytensor.Register
+def _map_or_apply(input_layer, op, *args, **kwargs):
+  """Map op across the input if it is a sequence; otherwise apply it.
+
+  Note: This takes a keyword argument `right_` to right apply the op to this
+  input. The name is chosen to limit conflicts with other keyword arguments.
+
+  Args:
+    input_layer: The input_layer (self when chaining).
+    op: The op to apply:
+    *args: Positional arguments for op; if input is a list then any iterable is
+      treated as an argument to co-map (i.e. it zips across non-scalars).
+    **kwargs: Keyword arguments for op; note that `right_` is used by this
+      function.
+  Returns:
+    A new Pretty Tensor that is the result of applying the op to every internal
+    Tensor.
+  Raises:
+    ValueError: If a sequence argument is not the same length as the
+      input_layer.
+  """
+  # Name is special because it can also set the name scope.
+  kwargs.pop('name')
+  right = kwargs.pop('right_', False)
+  if input_layer.is_sequence():
+    if right:
+      args += (input_layer,)
+    else:
+      args = ((input_layer,) + args)
+    result = [op(*x, **kwargs) for x in _zip_with_scalars(args)]
+    if len(result) != len(input_layer):
+      raise ValueError('Not all arguments were the same length.')
+    return result
+  else:
+    if right:
+      my_op = lambda x: op(*(args + (x,)), **kwargs)
+    else:
+      my_op = lambda x: op(x, *args, **kwargs)
+    return my_op(input_layer.tensor)
+

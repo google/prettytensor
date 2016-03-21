@@ -231,7 +231,7 @@ method.
 - - -
 
 
-### variable(var_name, shape, init, dt=<dtype: 'float32'>, train=True) {#variable}
+### variable(var_name, shape, init, dt=<dtype: 'float32'>, train=None) {#variable}
 
 
 
@@ -251,7 +251,8 @@ thrown.
 * init: The init function to use or a Tensor to copy.
 * dt: The datatype, defaults to float. This will automatically extract the
  base dtype.
-* train: Whether or not the variable should be trained.
+* train: Whether or not the variable should be trained; defaults to
+ True unless a default_scope has overridden it.
 
 ##### Returns:
 

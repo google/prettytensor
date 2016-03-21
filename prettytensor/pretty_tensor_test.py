@@ -308,18 +308,35 @@ class PrettyTensorTest(pretty_tensor_testing.PtTestCase):
     result = self.RunTensor(st)
     self.assertEqual(20, result.shape[1])
 
+  def MultiLayer(self):
+    """Builds a multi layer network to verify the impact of scopes."""
+    input_layer = prettytensor.wrap(self.input_layer)
+
+    st = input_layer.sequential()
+    st.reshape([DIM_SAME, DIM_SAME, DIM_SAME, 1])
+    st.conv2d([3, 3], 10, tf.nn.relu)
+    st.flatten()
+    st.fully_connected(20)
+    st.softmax_classifier(2, labels=numpy.array([[1, 0], [0, 1]],
+                                                dtype=numpy.float32))
+
   def testNoSummaries(self):
     with prettytensor.defaults_scope(summary_collections=None):
-      input_layer = prettytensor.wrap(self.input_layer)
-
-      st = input_layer.sequential()
-      st.reshape([DIM_SAME, DIM_SAME, DIM_SAME, 1])
-      st.conv2d([3, 3], 10, tf.nn.relu)
-      st.flatten()
-      st.fully_connected(20)
-      st.softmax_classifier(2, labels=numpy.array([[1, 0], [0, 1]],
-                                                  dtype=numpy.float32))
+      self.MultiLayer()
     self.assertEqual([], tf.get_collection(tf.GraphKeys.SUMMARIES))
+
+  def testVariableCollections(self):
+    with prettytensor.defaults_scope(variable_collections=['a']):
+      self.MultiLayer()
+    self.assertTrue(tf.get_collection('a'))
+    self.assertEqual(tf.get_collection('a'),
+                     tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES))
+    self.assertTrue(tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES))
+
+  def testVariableNotTrainable(self):
+    with prettytensor.defaults_scope(trainable_variables=False):
+      self.MultiLayer()
+    self.assertFalse(tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES))
 
   def testChainFull(self):
     chained = self.input_layer.flatten().fully_connected(
@@ -743,27 +760,62 @@ class PrettyTensorTest(pretty_tensor_testing.PtTestCase):
   def testMathOperators(self):
     operators = [operator.add, operator.sub, operator.mul]
 
+    input2 = self.input * 4
+    sequence_input = prettytensor.wrap_sequence([self.input, input2])
+
     # Test reverse ops
     for op in operators:
       print(op.__name__)
       t1 = op(2., self.input)
       t2 = op(2., self.input_layer)
+      seq1 = op([2., 1.], sequence_input)
+      seq2 = op(2., sequence_input)
+
+      # Used to validate the sequence.
+      t3 = op(1., input2)
+      t4 = op(2., input2)
+
       r1 = self.RunTensor(t1)
       r2 = self.RunTensor(t2)
+      r3 = self.RunTensor(t3)
+      r4 = self.RunTensor(t4)
+      seq_r1 = self.RunTensor(seq1)
+      seq_r2 = self.RunTensor(seq2)
 
       self.assertTrue(isinstance(t2, pretty_tensor_class.Layer))
       testing.assert_allclose(r1, r2, rtol=TOLERANCE)
+
+      testing.assert_allclose(seq_r1[0], r2, rtol=TOLERANCE)
+      testing.assert_allclose(seq_r1[1], r3, rtol=TOLERANCE)
+      testing.assert_allclose(seq_r2[0], r2, rtol=TOLERANCE)
+      testing.assert_allclose(seq_r2[1], r4, rtol=TOLERANCE)
 
     # Test forward ops
     for op in operators:
       t1 = op(self.input, 2.)
       t2 = op(self.input_layer, 2.)
+      seq1 = op(sequence_input, [2., 1.])
+      seq2 = op(sequence_input, 2.)
+
+      # Used to validate the sequence.
+      t3 = op(input2, 1.)
+      t4 = op(input2, 2.)
+
       r1 = self.RunTensor(t1)
       r2 = self.RunTensor(t2)
+      r3 = self.RunTensor(t3)
+      r4 = self.RunTensor(t4)
+      seq_r1 = self.RunTensor(seq1)
+      seq_r2 = self.RunTensor(seq2)
 
       self.assertTrue(isinstance(t2, pretty_tensor_class.Layer))
       testing.assert_allclose(
           r1, r2, rtol=TOLERANCE, err_msg='Op: %s' % op.__name__)
+
+      testing.assert_allclose(seq_r1[0], r2, rtol=TOLERANCE)
+      testing.assert_allclose(seq_r1[1], r3, rtol=TOLERANCE)
+      testing.assert_allclose(seq_r2[0], r2, rtol=TOLERANCE)
+      testing.assert_allclose(seq_r2[1], r4, rtol=TOLERANCE)
 
     operators.extend([operator.truediv])
     for op in operators:
@@ -784,9 +836,31 @@ class PrettyTensorTest(pretty_tensor_testing.PtTestCase):
       r1 = self.RunTensor(t1)
       r2 = self.RunTensor(t2)
 
+      seq = op(sequence_input)
+      seq_r = self.RunTensor(seq)
+      t3 = op(input2)
+      r3 = self.RunTensor(t3)
+
       self.assertTrue(isinstance(t2, pretty_tensor_class.Layer))
       testing.assert_allclose(
           r1, r2, rtol=TOLERANCE, err_msg='Op: %s' % op.__name__)
+      testing.assert_allclose(
+          r1, seq_r[0], rtol=TOLERANCE, err_msg='Op: %s' % op.__name__)
+      testing.assert_allclose(
+          r3, seq_r[1], rtol=TOLERANCE, err_msg='Op: %s' % op.__name__)
+
+  def testMathOperatorSideEffects(self):
+    seq = self.input_layer.sequential()
+
+    t1 = seq + 1
+
+    self.assertTrue(t1.tensor is not seq.tensor,
+                    '%s %s' % (t1.tensor, seq.tensor))
+
+    seq += 1
+    r1 = self.RunTensor(t1)
+    r2 = self.RunTensor(seq)
+    testing.assert_allclose(r1, r2, rtol=TOLERANCE)
 
 
 if __name__ == '__main__':
