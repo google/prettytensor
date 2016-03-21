@@ -1,3 +1,14 @@
+## 0.6.0
+
+1. Adding scoped control of summary creation.
+2. Scoped variable collections.
+3. Can initialize variables from literals.
+4. Fixed operators -- Sequential's plus no longer has side effects.
+5. Operators now work on Pretty Tensors that contain lists.
+
+
+Note: (4) may be breaking!
+
 ## 0.5.3
 
 1. Fixing tutorials (thanks jkahn!)
