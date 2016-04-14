@@ -16,5 +16,8 @@ from __future__ import print_function
 # pylint: disable=unused-import, wildcard-import
 from prettytensor.input_helpers import batch
 from prettytensor.input_helpers import feed_numpy
+from prettytensor.local_trainer import create_checkpointing_runner
+from prettytensor.local_trainer import create_follower_runner
 from prettytensor.local_trainer import Runner
 from prettytensor.recurrent_networks import RecurrentRunner
+from prettytensor.replay_queue import ReplayableQueue

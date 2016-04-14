@@ -195,6 +195,16 @@ class LocalTrainerTest(unittest.TestCase):
                          (self.input, self.target),
                          self.xor_data,
                          print_every=2)
+    with tf.Session():
+      with self.assertRaisesRegexp(ValueError, r'.*\bstop_queues\b.*'):
+        runner.train_model(train_op,
+                           self.softmax_result.loss,
+                           100,
+                           (self.input, self.target),
+                           self.xor_data,
+                           print_every=2)
+
+    runner.stop_queues()
     qr.assert_worked(self)
 
   def test_queue_error(self):
@@ -214,28 +224,6 @@ class LocalTrainerTest(unittest.TestCase):
                            self.xor_data,
                            print_every=2)
     qr.assert_worked(self)
-
-  def test_external_queues(self):
-    class NoCallQR(object):
-
-      def create_threads(self, *unused_args, **unused_kwargs):
-        assert False, 'Threads should not be started.'
-    tf.train.add_queue_runner(NoCallQR())
-
-    runner = local_trainer.Runner()
-    coord = tf.train.Coordinator()
-    with tf.Session():
-      optimizer = tf.train.GradientDescentOptimizer(0.5)
-      train_op = pt.apply_optimizer(optimizer,
-                                    losses=[self.softmax_result.loss])
-
-      runner.train_model(train_op,
-                         self.softmax_result.loss,
-                         10,
-                         (self.input, self.target),
-                         self.xor_data,
-                         print_every=2,
-                         external_coordinator=coord)
 
 
 class FakeQueueRunner(object):

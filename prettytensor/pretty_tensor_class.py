@@ -1014,7 +1014,7 @@ class Layer(PrettyTensor):
   @property
   def sequence(self):
     """Returns the sequence for this layer."""
-    if self._tensor:
+    if self._tensor is not None:
       raise ValueError('This PrettyTensor is currently a Tensor.')
     return self._sequence
 

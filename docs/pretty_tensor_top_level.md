@@ -37,13 +37,13 @@ and other multi-loss structures.
 - - -
 
 
-### get_shape() {#get_shape}
+### <a name="get_shape"></a>get_shape()
 
 
 
 
 
-### is_sequence() {#is_sequence}
+### <a name="is_sequence"></a>is_sequence()
 
 
 
@@ -54,7 +54,7 @@ Losses are never sequences.
 
 
 
-### mark_as_required() {#mark_as_required}
+### <a name="mark_as_required"></a>mark_as_required()
 
 
 
@@ -118,7 +118,7 @@ caveats.
 - - -
 
 
-### create_deferred(func, input_layer, deferred_args, deferred_kwargs, name) {#create_deferred}
+### <a name="create_deferred"></a>create_deferred(func, input_layer, deferred_args, deferred_kwargs, name)
 
 
 
@@ -141,13 +141,13 @@ A _DeferredLayer that will execute func in the correct scopes.
 
 
 
-### create_method(obj) {#create_method}
+### <a name="create_method"></a>create_method(obj)
 
 
 
 
 
-### fill_kwargs(input_layer, kwargs) {#fill_kwargs}
+### <a name="fill_kwargs"></a>fill_kwargs(input_layer, kwargs)
 
 
 
@@ -178,7 +178,7 @@ scoping).
 - - -
 
 
-### create_method(func) {#create_method}
+### <a name="create_method"></a>create_method(func)
 
 
 
@@ -189,7 +189,7 @@ Creates the method.
 
 
 
-### fill_kwargs(input_layer, kwargs) {#fill_kwargs}
+### <a name="fill_kwargs"></a>fill_kwargs(input_layer, kwargs)
 
 
 
@@ -213,7 +213,7 @@ variable automatically forces the graph to be a template.
 - - -
 
 
-### has_default() {#has_default}
+### <a name="has_default"></a>has_default()
 
 
 
@@ -231,7 +231,7 @@ method.
 - - -
 
 
-### variable(var_name, shape, init, dt=<dtype: 'float32'>, train=None) {#variable}
+### <a name="variable"></a>variable(var_name, shape, init, dt=<dtype: 'float32'>, train=None)
 
 
 
@@ -270,7 +270,7 @@ A TensorFlow tensor.
 
 - - -
 
-## apply_optimizer(losses, regularize=True, include_marked=True) {#apply_optimizer}
+## <a name="apply_optimizer"></a>apply_optimizer(losses, regularize=True, include_marked=True)
 
 
 
@@ -313,7 +313,7 @@ An operation to use for training that also updates any required ops such as
 
 - - -
 
-## for_default_graph() {#for_default_graph}
+## <a name="for_default_graph"></a>for_default_graph()
 
 
 
@@ -339,7 +339,7 @@ A new Bookkeeper.
 
 - - -
 
-## for_new_graph() {#for_new_graph}
+## <a name="for_new_graph"></a>for_new_graph()
 
 
 
@@ -366,7 +366,7 @@ A new Bookkeeper.
 
 - - -
 
-## construct_all() {#construct_all}
+## <a name="construct_all"></a>construct_all()
 
 
 
@@ -396,7 +396,7 @@ A list of results corresponding to templates.
 
 - - -
 
-## create_composite_loss(regularize=True, include_marked=True, name=cost) {#create_composite_loss}
+## <a name="create_composite_loss"></a>create_composite_loss(regularize=True, include_marked=True, name=cost)
 
 
 
@@ -420,9 +420,21 @@ A single tensor that is the sum of all losses.
 - - -
 
 
-## defaults_scope(... {#defaults_scope}
+## <a name="defaults_scope"></a>defaults_scope(...
 
-Many Pretty Tensor methods support setting defaults. The supported defaults and methods that use them are:
+defaults_scope(activation_fn=None, batch_normalize=None, l2loss=None, learned_moments_update_rate=None, phase=None, scale_after_normalization=None, stddev=None, summary_collections=None, trainable_variables=None, unroll=None, variable_collections=None, variance_epsilon=None)
+
+Creates a scope for the defaults that are used in a `with` block.
+
+  In addition to setting defaults for some methods, this also can control:
+
+  * `summary_collections`: Choose which collection to place summaries in or
+      disable with `None`.
+  * `trainable_variables`: Boolean indicating if variables are trainable.
+  * `variable_collections`: Default collections in which to place variables;
+      `tf.GraphKeys.VARIABLES` is always included.
+
+  The supported defaults and methods that use them are:
 
 
 * `activation_fn`:
@@ -464,7 +476,7 @@ Many Pretty Tensor methods support setting defaults. The supported defaults and 
 
 - - -
 
-## global_step() {#global_step}
+## <a name="global_step"></a>global_step()
 
 
 
@@ -476,7 +488,7 @@ Returns the global step variable.
 
 - - -
 
-## join_pretty_tensors(output, join_function=None, name=join) {#join_pretty_tensors}
+## <a name="join_pretty_tensors"></a>join_pretty_tensors(output, join_function=None, name=join)
 
 
 
@@ -504,7 +516,7 @@ The result of calling with_tensor on output
 
 - - -
 
-## make_template(func) {#make_template}
+## <a name="make_template"></a>make_template(func)
 
 
 
@@ -516,14 +528,14 @@ Given an arbitrary function, wrap it so that it does parameter sharing.
 
 - - -
 
-## recurrent_state() {#recurrent_state}
+## <a name="recurrent_state"></a>recurrent_state()
 
 
 
 
 - - -
 
-## set_recurrent_state_saver() {#set_recurrent_state_saver}
+## <a name="set_recurrent_state_saver"></a>set_recurrent_state_saver()
 
 
 
@@ -535,7 +547,7 @@ Sets the state saver used for recurrent sequences.
 
 - - -
 
-## template(books=None, optional=False) {#template}
+## <a name="template"></a>template(books=None, optional=False)
 
 
 
@@ -561,7 +573,7 @@ A template that can be constructed or attached to other layers and that
 
 - - -
 
-## with_update_ops() {#with_update_ops}
+## <a name="with_update_ops"></a>with_update_ops()
 
 
 
@@ -583,7 +595,7 @@ A new op that returns the same value as train_op, but also runs the
 
 - - -
 
-## wrap(books=None, tensor_shape=None) {#wrap}
+## <a name="wrap"></a>wrap(books=None, tensor_shape=None)
 
 
 
@@ -606,7 +618,7 @@ A layer.
 
 - - -
 
-## wrap_sequence(books=None, tensor_shape=None) {#wrap_sequence}
+## <a name="wrap_sequence"></a>wrap_sequence(books=None, tensor_shape=None)
 
 
 

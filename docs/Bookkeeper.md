@@ -22,7 +22,7 @@ The following properties are exposed:
 [TOC]
 
 
-## add_average_summary(var, tag=None, decay=0.999, ignore_nan=True) {#add_average_summary}
+## <a name="add_average_summary"></a>add_average_summary(var, tag=None, decay=0.999, ignore_nan=True)
 
 
 
@@ -57,7 +57,7 @@ The averaged variable.
 
 - - -
 
-## add_histogram_summary(tensor, tag=None) {#add_histogram_summary}
+## <a name="add_histogram_summary"></a>add_histogram_summary(tensor, tag=None)
 
 
 
@@ -69,7 +69,7 @@ Add a summary operation to visualize any tensor.
 
 - - -
 
-## add_loss(loss, name=None, regularization=False, add_summaries=True) {#add_loss}
+## <a name="add_loss"></a>add_loss(loss, name=None, regularization=False, add_summaries=True)
 
 
 
@@ -89,14 +89,14 @@ Append a loss to the total loss for the network.
 
 - - -
 
-## add_losses(losses, regularization=False) {#add_losses}
+## <a name="add_losses"></a>add_losses(losses, regularization=False)
 
 
 
 
 - - -
 
-## add_scalar_summary(x, tag=None) {#add_scalar_summary}
+## <a name="add_scalar_summary"></a>add_scalar_summary(x, tag=None)
 
 
 
@@ -108,14 +108,14 @@ Adds a scalar summary for x.
 
 - - -
 
-## check_summary(tag) {#check_summary}
+## <a name="check_summary"></a>check_summary(tag)
 
 
 
 
 - - -
 
-## create_composite_loss(losses, regularize=True, include_marked=True, name=cost) {#create_composite_loss}
+## <a name="create_composite_loss"></a>create_composite_loss(losses, regularize=True, include_marked=True, name=cost)
 
 
 
@@ -142,7 +142,7 @@ A single tensor that is the sum of all losses.
 
 - - -
 
-## exponential_moving_average(var, avg_var=None, decay=0.999, ignore_nan=False) {#exponential_moving_average}
+## <a name="exponential_moving_average"></a>exponential_moving_average(var, avg_var=None, decay=0.999, ignore_nan=False)
 
 
 
@@ -175,7 +175,7 @@ The averaged variable.
 
 - - -
 
-## reset_summary_collections() {#reset_summary_collections}
+## <a name="reset_summary_collections"></a>reset_summary_collections()
 
 
 
@@ -187,7 +187,7 @@ Sets the summary collections to the default.
 
 - - -
 
-## with_update_ops(train_op) {#with_update_ops}
+## <a name="with_update_ops"></a>with_update_ops(train_op)
 
 
 

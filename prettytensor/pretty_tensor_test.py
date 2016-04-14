@@ -30,7 +30,6 @@ from prettytensor import pretty_tensor_class
 from prettytensor import pretty_tensor_methods
 from prettytensor import pretty_tensor_testing
 
-
 TOLERANCE = 0.000001
 
 
@@ -48,12 +47,14 @@ class PrettyTensorTest(pretty_tensor_testing.PtTestCase):
     super(self.__class__, self).setUp()
     # Input is 2x3x5, which isn't a natural size for any op.
     self.input_data = numpy.array(
-        [[[1, 2, 3, 4, 5], [6, 7, 8, 9, 10], [10, 12, 13, 14, 15],],
-         [[-1, 2, -3, 4, -5], [6, -7, 8, -9, 10],
-          [-10, 12, -13, 14, -15]]], dtype=numpy.float)
-    self.input = tf.constant(
-        self.input_data, shape=list(self.input_data.shape),
-        dtype=tf.float32)
+        [[[1, 2, 3, 4, 5],
+          [6, 7, 8, 9, 10],
+          [10, 12, 13, 14, 15],], [[-1, 2, -3, 4, -5], [6, -7, 8, -9, 10],
+                                   [-10, 12, -13, 14, -15]]],
+        dtype=numpy.float)
+    self.input = tf.constant(self.input_data,
+                             shape=list(self.input_data.shape),
+                             dtype=tf.float32)
     self.input_layer = self.Wrap(self.input, self.input_data.shape)
 
   def testInit(self):
@@ -65,7 +66,9 @@ class PrettyTensorTest(pretty_tensor_testing.PtTestCase):
     flattened = self.input_layer.flatten()
     out = self.RunTensor(flattened)
     testing.assert_allclose(
-        self.input_data.reshape([2, 15]), out, rtol=TOLERANCE)
+        self.input_data.reshape([2, 15]),
+        out,
+        rtol=TOLERANCE)
 
   def testBranch(self):
     # Explicit branching is not required, but make sure it works.
@@ -82,7 +85,8 @@ class PrettyTensorTest(pretty_tensor_testing.PtTestCase):
     out = self.RunTensor(out_pt)
 
     testing.assert_allclose(
-        out, numpy.array([[1.0, 2.0, 3.0, 5.0], [2.0, 4.0, 5.0, 6.0]]),
+        out,
+        numpy.array([[1.0, 2.0, 3.0, 5.0], [2.0, 4.0, 5.0, 6.0]]),
         rtol=TOLERANCE)
 
   def testDefaultJoinMethod(self):
@@ -94,7 +98,8 @@ class PrettyTensorTest(pretty_tensor_testing.PtTestCase):
     out = self.RunTensor(out_pt)
 
     testing.assert_allclose(
-        out, numpy.array([[1.0, 2.0, 3.0, 5.0], [2.0, 4.0, 5.0, 6.0]]),
+        out,
+        numpy.array([[1.0, 2.0, 3.0, 5.0], [2.0, 4.0, 5.0, 6.0]]),
         rtol=TOLERANCE)
 
   def testDefaultJoinAlignmentError(self):
@@ -110,7 +115,9 @@ class PrettyTensorTest(pretty_tensor_testing.PtTestCase):
     pt2 = self.Wrap(numpy.array([[2.0], [4.0]]))
     pt3 = self.Wrap(numpy.array([[5.0], [6.0]]))
     out_pt = prettytensor.join_pretty_tensors(
-        [pt1, pt2, pt3], pt1, join_function=tf.add_n)
+        [pt1, pt2, pt3],
+        pt1,
+        join_function=tf.add_n)
 
     out = self.RunTensor(out_pt)
 
@@ -161,7 +168,9 @@ class PrettyTensorTest(pretty_tensor_testing.PtTestCase):
     st.flatten()
     out = self.RunTensor(st)
     testing.assert_allclose(
-        self.input_data.reshape([2, 15]), out, rtol=TOLERANCE)
+        self.input_data.reshape([2, 15]),
+        out,
+        rtol=TOLERANCE)
 
   def testSubdivide(self):
     st = self.input_layer.sequential()
@@ -183,8 +192,7 @@ class PrettyTensorTest(pretty_tensor_testing.PtTestCase):
       a.fully_connected(10)
       b.fully_connected(10)
 
-    self.assertEqual(
-        [2, 10], st.shape, 'Unexpected shape: %s' % st.shape)
+    self.assertEqual([2, 10], st.shape, 'Unexpected shape: %s' % st.shape)
     self.sess.run(tf.initialize_all_variables())
     combined, a_val, b_val = self.sess.run([st.tensor, a.tensor, b.tensor])
     testing.assert_allclose(combined, a_val + b_val, rtol=TOLERANCE)
@@ -194,8 +202,7 @@ class PrettyTensorTest(pretty_tensor_testing.PtTestCase):
     label = numpy.zeros_like(input_data)
     label[0, 5] = 1
     label[1, 10] = 1
-    label_tensor = tf.constant(
-        label, shape=list(label.shape), dtype=tf.float32)
+    label_tensor = tf.constant(label, shape=list(label.shape), dtype=tf.float32)
     layer, cost = self.input_layer.flatten().softmax(label_tensor)
 
     softmax_out, cost_out = self.sess.run([layer.tensor, cost.tensor])
@@ -211,22 +218,11 @@ class PrettyTensorTest(pretty_tensor_testing.PtTestCase):
     st.max_pool(3, 2)
     result = self.RunTensor(st)
 
-    self.assertSequenceEqual(
-        result.shape, st.shape,
-        'Unexpected shape: %s vs %s' %
-        (result.shape, st.shape))
-    expected = numpy.array([[[[7.],
-                              [9.],
-                              [10.]],
-                             [[12.],
-                              [14.],
-                              [15.]]],
-                            [[[6.],
-                              [8.],
-                              [10.]],
-                             [[12.],
-                              [14.],
-                              [14.]]]])
+    self.assertSequenceEqual(result.shape, st.shape,
+                             'Unexpected shape: %s vs %s' %
+                             (result.shape, st.shape))
+    expected = numpy.array([[[[7.], [9.], [10.]], [[12.], [14.], [15.]]],
+                            [[[6.], [8.], [10.]], [[12.], [14.], [14.]]]])
     testing.assert_allclose(expected, result, rtol=TOLERANCE)
 
   def testMaxPoolingValid(self):
@@ -235,9 +231,9 @@ class PrettyTensorTest(pretty_tensor_testing.PtTestCase):
     st.max_pool(3, 2, prettytensor.PAD_VALID)
     result = self.RunTensor(st)
 
-    self.assertSequenceEqual(
-        result.shape, st.shape,
-        'Unexpected shape: %s vs %s' % (result.shape, st.shape))
+    self.assertSequenceEqual(result.shape, st.shape,
+                             'Unexpected shape: %s vs %s' %
+                             (result.shape, st.shape))
 
   def testConv(self):
     st = self.input_layer.sequential()
@@ -262,8 +258,8 @@ class PrettyTensorTest(pretty_tensor_testing.PtTestCase):
                                      variance_epsilon=0.001,
                                      scale_after_normalization=False):
       st.conv2d(3, 2)
-    self.assertEqual(
-        2, len(tf.get_collection(prettytensor.GraphKeys.UPDATE_OPS)))
+    self.assertEqual(2,
+                     len(tf.get_collection(prettytensor.GraphKeys.UPDATE_OPS)))
 
   def testConvBadShape(self):
     with self.assertRaises(ValueError):
@@ -285,8 +281,7 @@ class PrettyTensorTest(pretty_tensor_testing.PtTestCase):
   def testFullWithWeightMatrix(self):
     weights = numpy.array([[1., 0.], [0., 1.]])
     in_ = numpy.array([[5., 6.]])
-    st = prettytensor.wrap(in_).fully_connected(
-        2, init=weights)
+    st = prettytensor.wrap(in_).fully_connected(2, init=weights)
     result = self.RunTensor(st)
     testing.assert_allclose(in_, result, rtol=TOLERANCE)
 
@@ -317,8 +312,10 @@ class PrettyTensorTest(pretty_tensor_testing.PtTestCase):
     st.conv2d([3, 3], 10, tf.nn.relu)
     st.flatten()
     st.fully_connected(20)
-    st.softmax_classifier(2, labels=numpy.array([[1, 0], [0, 1]],
-                                                dtype=numpy.float32))
+    st.softmax_classifier(2,
+                          labels=numpy.array(
+                              [[1, 0], [0, 1]],
+                              dtype=numpy.float32))
 
   def testNoSummaries(self):
     with prettytensor.defaults_scope(summary_collections=None):
@@ -329,8 +326,9 @@ class PrettyTensorTest(pretty_tensor_testing.PtTestCase):
     with prettytensor.defaults_scope(variable_collections=['a']):
       self.MultiLayer()
     self.assertTrue(tf.get_collection('a'))
-    self.assertEqual(tf.get_collection('a'),
-                     tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES))
+    self.assertEqual(
+        tf.get_collection('a'),
+        tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES))
     self.assertTrue(tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES))
 
   def testVariableNotTrainable(self):
@@ -339,8 +337,8 @@ class PrettyTensorTest(pretty_tensor_testing.PtTestCase):
     self.assertFalse(tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES))
 
   def testChainFull(self):
-    chained = self.input_layer.flatten().fully_connected(
-        20).fully_connected(30).fully_connected(40)
+    chained = self.input_layer.flatten().fully_connected(20).fully_connected(
+        30).fully_connected(40)
     result = self.RunTensor(chained)
 
     self.assertEqual(40, result.shape[1])
@@ -351,18 +349,9 @@ class PrettyTensorTest(pretty_tensor_testing.PtTestCase):
     st.average_pool(3, 2)
     result = self.RunTensor(st)
 
-    expected = numpy.array([[[[4.],
-                              [5.5],
-                              [7.]],
-                             [[8.75],
-                              [10.5],
-                              [12.]]],
-                            [[[0.],
-                              [-0.83333331],
-                              [0.]],
-                             [[0.25],
-                              [0.83333331],
-                              [0.]]]])
+    expected = numpy.array([[[[4.], [5.5], [7.]], [[8.75], [10.5], [12.]]], [
+        [[0.], [-0.83333331], [0.]], [[0.25], [0.83333331], [0.]]
+    ]])
     testing.assert_allclose(expected, result, rtol=TOLERANCE)
 
   def testDropoutTraining(self):
@@ -387,21 +376,22 @@ class PrettyTensorTest(pretty_tensor_testing.PtTestCase):
     label = numpy.zeros_like(self.input_data)
     label[0, 1, 1] = 100
     label[1, 2, 3] = 100
-    label_tensor = tf.constant(
-        label, shape=list(label.shape), dtype=tf.float32)
+    label_tensor = tf.constant(label, shape=list(label.shape), dtype=tf.float32)
     cost = self.input_layer.l2_regression(label_tensor)
 
     cost_out = self.RunTensor(cost)
-    expected = ((self.input_data - label) ** 2).sum() / len(label)
+    expected = ((self.input_data - label)**2).sum() / len(label)
 
     testing.assert_allclose(expected, cost_out, rtol=TOLERANCE)
 
   # pylint: disable=unused-variable,invalid-name
   def testMethodRegistration(self):
+
     @prettytensor.Register()
     def test_method1(input_layer):
       self.assertEqual(self.input_layer, input_layer)
       return tf.constant('success')
+
     result = self.RunTensor(self.input_layer.test_method1())
     self.assertEqual(b'success', result)
 
@@ -427,6 +417,7 @@ class PrettyTensorTest(pretty_tensor_testing.PtTestCase):
     def test_method4(_):
       pass
     with self.assertRaises(AssertionError):
+
       @prettytensor.Register(method_name='test_method4')
       def test_method4_repeat(_):
         pass
@@ -434,6 +425,7 @@ class PrettyTensorTest(pretty_tensor_testing.PtTestCase):
   def testMethodRegistrationClashesWithLayerWrapper(self):
     # pylint: disable=unused-variable,invalid-name
     with self.assertRaises(AssertionError):
+
       @prettytensor.Register()
       def tensor(_):
         pass
@@ -444,6 +436,7 @@ class PrettyTensorTest(pretty_tensor_testing.PtTestCase):
     def test_method5(input_layer):
       self.assertEqual(self.input_layer, input_layer)
       return tf.constant('success')
+
     result = self.RunTensor(self.input_layer.another_test())
     self.assertEqual(b'success', result)
 
@@ -452,6 +445,7 @@ class PrettyTensorTest(pretty_tensor_testing.PtTestCase):
     @prettytensor.Register()
     def test_function1(tensor):
       return tf.nn.relu(tensor)
+
     test_result = self.input_layer.test_function1()
 
     result = self.RunTensor(test_result)
@@ -463,6 +457,7 @@ class PrettyTensorTest(pretty_tensor_testing.PtTestCase):
     @prettytensor.Register
     def test_function3(tensor):
       return tf.reshape(tensor, [-1])
+
     result = self.input_layer.test_function3()
     self.assertEqual(result.shape, [30])
 
@@ -476,6 +471,7 @@ class PrettyTensorTest(pretty_tensor_testing.PtTestCase):
     def test_function4(tensor, one, two=None, three=True):
       """I am a doc string."""
       return tf.reshape(tensor, [-1]), '*'
+
     self.assertEqual(
         self.input_layer.test_function4.__doc__,
         'test_function4(one, two=None, three=True)\n\nI am a doc string.')
@@ -494,8 +490,8 @@ class PrettyTensorTest(pretty_tensor_testing.PtTestCase):
     shape[0] = None
     input_data = tf.placeholder(tf.float32, shape)
 
-    nn = self.Wrap(input_data).flatten().fully_connected(
-        100).fully_connected(200)
+    nn = self.Wrap(input_data).flatten().fully_connected(100).fully_connected(
+        200)
     self.assertEquals([None, 200], nn.tensor.get_shape().as_list())
 
   def testUnknownShapeFullyConnected(self):
@@ -538,20 +534,24 @@ class PrettyTensorTest(pretty_tensor_testing.PtTestCase):
     self.assertEquals(['_', -1], shape)
 
   def testSoftmaxEval(self):
-    np_prediction = numpy.array([
-        [0, 1, 0],
-        [0, 0, 1],
-        [1, 0, 0],
-        [0, 1, 0],
-        [0, 1, 0],
-    ], dtype=numpy.float)
-    actual = numpy.array([
-        [0, 1, 0],
-        [1, 0, 0],
-        [1, 0, 0],
-        [0, 0, 1],
-        [0, 1, 0],
-    ], dtype=numpy.float)
+    np_prediction = numpy.array(
+        [
+            [0, 1, 0],
+            [0, 0, 1],
+            [1, 0, 0],
+            [0, 1, 0],
+            [0, 1, 0],
+        ],
+        dtype=numpy.float)
+    actual = numpy.array(
+        [
+            [0, 1, 0],
+            [1, 0, 0],
+            [1, 0, 0],
+            [0, 0, 1],
+            [0, 1, 0],
+        ],
+        dtype=numpy.float)
     weights = numpy.array([1, 1, 1, 0, 0], dtype=numpy.float)
     prediction = self.Wrap(np_prediction)
 
@@ -560,8 +560,8 @@ class PrettyTensorTest(pretty_tensor_testing.PtTestCase):
     testing.assert_allclose(numpy.array([0.6]), result, rtol=TOLERANCE)
 
     # Ensure that an integer type works.
-    evaluation = prediction.evaluate_classifier(
-        tf.constant(actual.astype(numpy.int32)))
+    evaluation = prediction.evaluate_classifier(tf.constant(actual.astype(
+        numpy.int32)))
     result = self.RunTensor(evaluation)
     testing.assert_allclose(numpy.array([0.6]), result, rtol=TOLERANCE)
 
@@ -571,45 +571,50 @@ class PrettyTensorTest(pretty_tensor_testing.PtTestCase):
     testing.assert_allclose(numpy.array([2. / 3.]), result, rtol=TOLERANCE)
 
   def testEvaluatorCreatesUniqueVariables(self):
-    actual = numpy.array([
-        [0, 1, 0],
-        [1, 0, 0],
-    ], dtype=numpy.float)
+    actual = numpy.array([[0, 1, 0], [1, 0, 0],], dtype=numpy.float)
     with tf.variable_scope('scope') as vs:
-      (self.input_layer
-       .flatten()
-       .softmax_classifier(3))
+      (self.input_layer.flatten().softmax_classifier(3))
     with tf.variable_scope(vs, reuse=True):
       # We would have an exception if evaluate_classifier used get_variable to
       # create a new variable. The first example doesn't add
       # evaluate_classifier.
-      (self.input_layer
-       .flatten()
-       .softmax_classifier(3).softmax
-       .evaluate_classifier(actual, phase=prettytensor.Phase.test))
+      (self.input_layer.flatten()
+       .softmax_classifier(3).softmax.evaluate_classifier(
+           actual,
+           phase=prettytensor.Phase.test))
 
   def testBinaryCrossEntropy(self):
     n1 = numpy.array([[2., 3., 4., 5., -6., -7.]], dtype=numpy.float32)
     n2 = numpy.array([[1., 1., 0., 0., 0., 1.]], dtype=numpy.float32)
     ftensor1 = prettytensor.wrap(n1)
     ftensor2 = prettytensor.wrap(n2)
-    out = self.RunTensor(
-        ftensor1.binary_cross_entropy_with_logits(ftensor2))
-    testing.assert_allclose(
-        out,
-        numpy.sum(n1 * (1-n2) + numpy.log(1 + numpy.exp(-n1)), axis=1),
-        rtol=0.00001)
+    out = self.RunTensor(ftensor1.binary_cross_entropy_with_logits(ftensor2))
+    testing.assert_allclose(out,
+                            numpy.sum(n1 *
+                                      (1 - n2) + numpy.log(1 + numpy.exp(-n1)),
+                                      axis=1),
+                            rtol=0.00001)
+
+  def testBinaryCrossEntropyWithPerOutputWeights(self):
+    n1 = numpy.array([[2., 3., 4.], [5., -6., -7.]], dtype=numpy.float32)
+    n2 = numpy.array([[1., 1., 0.], [0., 0., 1.]], dtype=numpy.float32)
+    ftensor1 = prettytensor.wrap(n1)
+    ftensor2 = prettytensor.wrap(n2)
+    weights = numpy.random.rand(*n1.shape).astype(numpy.float32)
+    out = self.RunTensor(ftensor1.binary_cross_entropy_with_logits(
+        ftensor2,
+        per_output_weights=weights))
+    expected = (numpy.sum((n1 * (1 - n2) + numpy.log(1 + numpy.exp(-n1))) *
+                          weights) / len(n1))
+    testing.assert_allclose(out, expected, rtol=0.00001)
 
   def testSampledSoftmax(self):
     """Tests that sampled softmax runs properly."""
-    actual = numpy.array([
-        [1],
-        [0],
-    ], dtype=numpy.int64)
-    softmax, loss = (
-        self.input_layer
-        .flatten()
-        .softmax_classifier_with_sampled_loss(3, actual, num_sampled=2))
+    actual = numpy.array([[1], [0],], dtype=numpy.int64)
+    softmax, loss = (self.input_layer.flatten()
+                     .softmax_classifier_with_sampled_loss(3,
+                                                           actual,
+                                                           num_sampled=2))
 
     self.sess.run(tf.initialize_all_variables())
     out_softmax, out_loss = self.sess.run((softmax, loss))
@@ -651,11 +656,11 @@ class PrettyTensorTest(pretty_tensor_testing.PtTestCase):
   def testPrecisionAndRecall(self):
     np_prediction = numpy.array(
         [
-            [0, 1, 1],   # tp = 1, fp = 1, fn = 1, tn = 0
-            [0, 0, 1],   # tp = 0, fp = 1, fn = 1, tn = 1
-            [1, 0, 0],   # tp = 1, fp = 0, fn = 0, tn = 2
-            [0, 1, 0],   # tp = 0, fp = 1, fn = 1, tn = 1
-            [0, 1, 0],   # tp = 1, fp = 0, fn = 1, tn = 1
+            [0, 1, 1],  # tp = 1, fp = 1, fn = 1, tn = 0
+            [0, 0, 1],  # tp = 0, fp = 1, fn = 1, tn = 1
+            [1, 0, 0],  # tp = 1, fp = 0, fn = 0, tn = 2
+            [0, 1, 0],  # tp = 0, fp = 1, fn = 1, tn = 1
+            [0, 1, 0],  # tp = 1, fp = 0, fn = 1, tn = 1
         ],
         dtype=numpy.float)
     actual = numpy.array(
@@ -672,7 +677,7 @@ class PrettyTensorTest(pretty_tensor_testing.PtTestCase):
     evaluation = prediction.evaluate_precision_recall(tf.constant(actual))
     p, r = self.RunTensor(evaluation)
     testing.assert_allclose(numpy.array(.5), p, rtol=TOLERANCE)
-    testing.assert_allclose(numpy.array(3./7), r, rtol=TOLERANCE)
+    testing.assert_allclose(numpy.array(3. / 7), r, rtol=TOLERANCE)
 
     evaluation = prediction.evaluate_precision_recall(
         tf.constant(actual),
@@ -698,20 +703,24 @@ class PrettyTensorTest(pretty_tensor_testing.PtTestCase):
     testing.assert_allclose(expected, dense, rtol=TOLERANCE)
 
   def testSoftmaxEvalAtTopK(self):
-    np_prediction = numpy.array([
-        [0, 1, 0],
-        [0.25, 0, 0.75],
-        [1, 0, 0],
-        [0.25, .65, .10],
-        [0, 1, 0],
-    ], dtype=numpy.float)
-    actual = numpy.array([
-        [0, 1, 0],
-        [1, 0, 0],
-        [1, 0, 0],
-        [0, 0, 1],
-        [0, 1, 0],
-    ], dtype=numpy.float)
+    np_prediction = numpy.array(
+        [
+            [0, 1, 0],
+            [0.25, 0, 0.75],
+            [1, 0, 0],
+            [0.25, .65, .10],
+            [0, 1, 0],
+        ],
+        dtype=numpy.float)
+    actual = numpy.array(
+        [
+            [0, 1, 0],
+            [1, 0, 0],
+            [1, 0, 0],
+            [0, 0, 1],
+            [0, 1, 0],
+        ],
+        dtype=numpy.float)
     prediction = self.Wrap(np_prediction)
 
     # TopK@1
@@ -731,13 +740,15 @@ class PrettyTensorTest(pretty_tensor_testing.PtTestCase):
 
   def testSoftmaxEvalAtTopKWithTie(self):
     np_prediction = numpy.zeros((5, 3), dtype=numpy.float)
-    actual = numpy.array([
-        [0, 1, 0],
-        [1, 0, 0],
-        [1, 0, 0],
-        [0, 0, 1],
-        [0, 1, 0],
-    ], dtype=numpy.float)
+    actual = numpy.array(
+        [
+            [0, 1, 0],
+            [1, 0, 0],
+            [1, 0, 0],
+            [0, 0, 1],
+            [0, 1, 0],
+        ],
+        dtype=numpy.float)
     prediction = self.Wrap(np_prediction)
     # Note: none of these are ideal. k=1 goes left-to-right and 1.0 is just
     # plain wrong for k>1
@@ -809,8 +820,10 @@ class PrettyTensorTest(pretty_tensor_testing.PtTestCase):
       seq_r2 = self.RunTensor(seq2)
 
       self.assertTrue(isinstance(t2, pretty_tensor_class.Layer))
-      testing.assert_allclose(
-          r1, r2, rtol=TOLERANCE, err_msg='Op: %s' % op.__name__)
+      testing.assert_allclose(r1,
+                              r2,
+                              rtol=TOLERANCE,
+                              err_msg='Op: %s' % op.__name__)
 
       testing.assert_allclose(seq_r1[0], r2, rtol=TOLERANCE)
       testing.assert_allclose(seq_r1[1], r3, rtol=TOLERANCE)
@@ -826,8 +839,10 @@ class PrettyTensorTest(pretty_tensor_testing.PtTestCase):
 
       self.assertFalse(isinstance(t1, pretty_tensor_class.Layer))
       self.assertTrue(isinstance(t2, pretty_tensor_class.Layer))
-      testing.assert_allclose(
-          r1, r2, rtol=TOLERANCE, err_msg='Op: %s' % op.__name__)
+      testing.assert_allclose(r1,
+                              r2,
+                              rtol=TOLERANCE,
+                              err_msg='Op: %s' % op.__name__)
 
     unary = [operator.neg, operator.abs]
     for op in unary:
@@ -842,12 +857,18 @@ class PrettyTensorTest(pretty_tensor_testing.PtTestCase):
       r3 = self.RunTensor(t3)
 
       self.assertTrue(isinstance(t2, pretty_tensor_class.Layer))
-      testing.assert_allclose(
-          r1, r2, rtol=TOLERANCE, err_msg='Op: %s' % op.__name__)
-      testing.assert_allclose(
-          r1, seq_r[0], rtol=TOLERANCE, err_msg='Op: %s' % op.__name__)
-      testing.assert_allclose(
-          r3, seq_r[1], rtol=TOLERANCE, err_msg='Op: %s' % op.__name__)
+      testing.assert_allclose(r1,
+                              r2,
+                              rtol=TOLERANCE,
+                              err_msg='Op: %s' % op.__name__)
+      testing.assert_allclose(r1,
+                              seq_r[0],
+                              rtol=TOLERANCE,
+                              err_msg='Op: %s' % op.__name__)
+      testing.assert_allclose(r3,
+                              seq_r[1],
+                              rtol=TOLERANCE,
+                              err_msg='Op: %s' % op.__name__)
 
   def testMathOperatorSideEffects(self):
     seq = self.input_layer.sequential()

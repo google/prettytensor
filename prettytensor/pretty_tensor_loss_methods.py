@@ -221,7 +221,8 @@ def binary_cross_entropy_with_logits(input_layer,
                                      target,
                                      name=PROVIDED,
                                      loss_weight=None,
-                                     per_example_weights=None):
+                                     per_example_weights=None,
+                                     per_output_weights=None):
   """Calculates the binary cross entropy of the input_layer vs inputs.
 
   Expects unscaled logits. Do not pass in results of sigmoid operation.
@@ -232,7 +233,11 @@ def binary_cross_entropy_with_logits(input_layer,
       that binary cross entropy is equivalent to logistic loss.
     name: The optional name.
     loss_weight: A scalar multiplier for the loss.
-    per_example_weights: A Tensor with a weight per example.
+    per_example_weights: A `Tensor` with a weight per example.
+    per_output_weights: A weight `Tensor` that is the same shape as the
+      input_layer that can be used to scale individual prediction losses.  See
+      `tf.tile` to turn a per-column weight vector into a `per_output_weights`
+      `Tensor`.
   Returns:
     Binary cross entropy loss after sigmoid operation.
   Raises:
@@ -255,10 +260,21 @@ def binary_cross_entropy_with_logits(input_layer,
           recall, 'average_recall_%s' % name)
     input_layer.bookkeeper.add_scalar_summary(
         tf.reduce_sum(tf.to_float(tf.greater(input_layer, 0))), 'activations')
+    if per_output_weights is not None:
+      per_output_weights = tf.convert_to_tensor(
+          per_output_weights,
+          name='per_output_weights',
+          dtype=input_layer.dtype.base_dtype)
+      input_layer.get_shape().assert_is_compatible_with(
+          per_output_weights.get_shape())
 
   def _batch_sum_bce(x, target, name='binary_cross_entropy'):
-    return functions.reduce_batch_sum(
-        functions.binary_cross_entropy_loss_with_logits(x, target, name=name))
+    logits = functions.binary_cross_entropy_loss_with_logits(x,
+                                                             target,
+                                                             name=name)
+    if per_output_weights is not None:
+      logits *= per_output_weights
+    return functions.reduce_batch_sum(logits)
 
   return apply_regression(
       input_layer,

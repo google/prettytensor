@@ -52,7 +52,7 @@ def var_and_name_scope(names):
       else:
         full_name = var_scope.name
 
-      vs_key = tf.get_collection(variable_scope._VARSCOPE_KEY)
+      vs_key = tf.get_collection_ref(variable_scope._VARSCOPE_KEY)
       try:
         # TODO(eiderman): Remove this hack or fix the full file.
         try:

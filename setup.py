@@ -13,12 +13,12 @@ import fnmatch
 import os
 from setuptools import find_packages, setup, Extension
 
-_VERSION = '0.6.0'
+_VERSION = '0.6.1'
 
 REQUIRED_PACKAGES = [
     'enum34 >= 1.0.0',
     'six >= 1.10.0',
-    'tensorflow >= 0.7.1',
+    'tensorflow >= 0.8.0rc0',
 ]
 
 # pylint: disable=line-too-long
