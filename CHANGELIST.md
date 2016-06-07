@@ -1,3 +1,16 @@
+## 0.6.2
+
+Add Depthwise Convolution
+
+### Batch Normalization
+1. Make Batch Normalization work with arbitrary dimensionality.
+2. Allow passing through arguments to BN using a namedtuple.
+3. Add BN default values.
+4. Remove requirement to use with_update_ops to make BN accumulate values for
+    inference.
+
+
+
 ## 0.6.0
 
 1. Adding scoped control of summary creation.
