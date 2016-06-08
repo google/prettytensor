@@ -148,6 +148,9 @@ A single tensor that is the sum of all losses.
 
 Calculates the exponential moving average.
 
+TODO(): check if this implementation of moving average can now
+be replaced by tensorflows implementation.
+
 Adds a variable to keep track of the exponential moving average and adds an
 update operation to the bookkeeper. The name of the variable is
 '%s_average' % name prefixed with the current variable scope.

@@ -819,7 +819,8 @@ class PrettyTensor(object):
   def _as_graph_element(self):
     """Returns the underlying graph element if possible."""
     if self.is_sequence():
-      raise TypeError('Cannot be represented as a graph element.')
+      raise TypeError('A Pretty Tensor that holds a sequence cannot be '
+                      'represented as a graph element.')
     else:
       # Self might be holding something else that isn't a true tensor, so
       # if the 'tensor' can behave like a graph element, look for its

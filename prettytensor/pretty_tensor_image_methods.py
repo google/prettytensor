@@ -19,99 +19,17 @@ import tensorflow as tf
 
 from prettytensor import layers
 from prettytensor import pretty_tensor_class as prettytensor
+from prettytensor import pretty_tensor_normalization_methods
 from prettytensor.pretty_tensor_class import PAD_SAME
-from prettytensor.pretty_tensor_class import Phase
 from prettytensor.pretty_tensor_class import PROVIDED
-
-
-# pylint: disable=invalid-name
-@prettytensor.Register(
-    assign_defaults=('learned_moments_update_rate', 'variance_epsilon',
-                     'scale_after_normalization', 'phase'))
-class batch_normalize(prettytensor.VarStoreMethod):
-
-  def __call__(self,
-               input_layer,
-               name=PROVIDED,
-               learned_moments_update_rate=None,
-               variance_epsilon=None,
-               scale_after_normalization=None,
-               phase=Phase.train):
-    """Batch normalize this layer.
-
-    This only supports global batch normalization and it can be enabled for all
-    convolutional layers by setting the default 'batch_normalize' to True.
-    learned_moments_update_rate, variance_epsilon and scale_after_normalization
-    need to either be set here or be set in defaults as well.
-
-    Args:
-      input_layer: The chainable object, supplied.
-      name: The name for this operation is also used to create/find the
-        parameter variables.
-      learned_moments_update_rate: Update rate for the learned moments.
-      variance_epsilon: A float. A small float number to avoid dividing by 0.
-      scale_after_normalization: A bool indicating whether the resulted tensor
-        needs to be multiplied with gamma.
-      phase: The phase of construction.
-    Returns:
-      Handle to the generated layer.
-    """
-    assert isinstance(learned_moments_update_rate, tf.compat.real_types)
-    assert isinstance(variance_epsilon, tf.compat.real_types)
-    assert scale_after_normalization is not None
-
-    # Allocate variables to hold the moving averages of the moments.
-    params_shape = [input_layer.shape[-1]]
-
-    # Allocate parameters for the beta and gamma of the normalization.
-    beta = self.variable('beta', params_shape, tf.constant_initializer(0.0))
-    gamma = self.variable('gamma', params_shape, tf.constant_initializer(1.0))
-    moving_mean = (self.variable('moving_mean',
-                                 params_shape,
-                                 tf.constant_initializer(0.0),
-                                 train=False))
-    moving_variance = self.variable('moving_variance',
-                                    params_shape,
-                                    tf.constant_initializer(1.0),
-                                    train=False)
-
-    if phase == Phase.train:
-      # Calculate the moments based on the individual batch.
-      mean, variance = tf.nn.moments(input_layer.tensor, [0, 1, 2])
-      input_layer.bookkeeper.add_histogram_summary(mean)
-      input_layer.bookkeeper.add_histogram_summary(variance)
-
-      input_layer.bookkeeper.exponential_moving_average(
-          mean, moving_mean, 1.0 - learned_moments_update_rate)
-      input_layer.bookkeeper.exponential_moving_average(
-          variance, moving_variance, 1.0 - learned_moments_update_rate)
-    else:
-      # Load the mean and variance as the 'moving average' moments
-      # from the checkpoint.
-      mean = moving_mean
-      variance = moving_variance
-
-    # Normalize the activations.
-    y = tf.nn.batch_norm_with_global_normalization(
-        input_layer.tensor,
-        mean,
-        variance,
-        beta,
-        gamma,
-        name=name,
-        scale_after_normalization=scale_after_normalization,
-        variance_epsilon=variance_epsilon)
-
-    return input_layer.with_tensor(y)
-# pylint: enable=invalid-name
 
 
 def _pool(input_layer, pool_fn, kernel, stride, edges, name):
   """Applies a pooling function."""
   input_layer.get_shape().assert_has_rank(4)
   if input_layer.get_shape().ndims not in (None, 4):
-    raise ValueError(
-        'Pooling requires a rank 4 tensor: %s' % input_layer.get_shape())
+    raise ValueError('Pooling requires a rank 4 tensor: %s' %
+                     input_layer.get_shape())
   kernel = _kernel(kernel)
   stride = _stride(stride)
   size = [1, kernel[0], kernel[1], 1]
@@ -200,7 +118,8 @@ class conv2d(prettytensor.VarStoreMethod):
       bias_init: An initializer for the bias or a Tensor.
       edges: Either SAME to use 0s for the out of bounds area or VALID to shrink
         the output size and only uses valid input pixels.
-      batch_normalize: Set to True to batch_normalize this layer.
+      batch_normalize: Supply a BatchNormalizationArguments to set the
+        parameters for batch normalization.
       name: The name for this operation is also used to create/find the
         parameter variables.
     Returns:
@@ -222,11 +141,18 @@ class conv2d(prettytensor.VarStoreMethod):
     if init is None:
       if stddev is None:
         patch_size = size[0] * size[1]
-        init = layers.xavier_init(size[2] * patch_size, size[3] * patch_size)
-      elif stddev:
-        init = tf.truncated_normal_initializer(stddev=stddev)
+        init = layers.he_init(size[2] * patch_size, size[3] * patch_size,
+                              activation_fn)
       else:
-        init = tf.zeros_initializer
+        tf.logging.warning(
+            'Passing `stddev` to initialize weight variable is deprecated and '
+            'will be removed in the future. Pass '
+            'tf.truncated_normal_initializer(stddev=stddev) or '
+            'tf.zeros_initializer to `init` instead.')
+        if stddev:
+          init = tf.truncated_normal_initializer(stddev=stddev)
+        else:
+          init = tf.zeros_initializer
     elif stddev is not None:
       raise ValueError('Do not set both init and stddev.')
     dtype = input_layer.tensor.dtype
@@ -234,24 +160,122 @@ class conv2d(prettytensor.VarStoreMethod):
     y = tf.nn.conv2d(input_layer, params, stride, edges)
     layers.add_l2loss(books, params, l2loss)
     if bias:
-      y += self.variable(
-          'bias',
-          [size[-1]],
-          bias_init,
-          dt=dtype)
+      y += self.variable('bias', [size[-1]], bias_init, dt=dtype)
     books.add_scalar_summary(
-        tf.reduce_mean(
-            layers.spatial_slice_zeros(y)), '%s/zeros_spatial' % y.op.name)
-    if batch_normalize:
-      y = input_layer.with_tensor(y).batch_normalize()
+        tf.reduce_mean(layers.spatial_slice_zeros(y)),
+        '%s/zeros_spatial' % y.op.name)
+    y = pretty_tensor_normalization_methods.batch_normalize_with_arguments(
+        y, batch_normalize)
     if activation_fn is not None:
       if not isinstance(activation_fn, collections.Sequence):
         activation_fn = (activation_fn,)
-      y = layers.apply_activation(
-          books,
-          y,
-          activation_fn[0],
-          activation_args=activation_fn[1:])
+      y = layers.apply_activation(books,
+                                  y,
+                                  activation_fn[0],
+                                  activation_args=activation_fn[1:])
+    books.add_histogram_summary(y, '%s/activations' % y.op.name)
+    return input_layer.with_tensor(y, parameters=self.vars)
+
+
+@prettytensor.Register(
+    assign_defaults=('activation_fn', 'l2loss', 'stddev', 'batch_normalize'))
+class depthwise_conv2d(prettytensor.VarStoreMethod):
+
+  def __call__(self,
+               input_layer,
+               kernel,
+               channel_multiplier,
+               activation_fn=None,
+               stride=None,
+               l2loss=None,
+               init=None,
+               stddev=None,
+               bias=True,
+               bias_init=tf.zeros_initializer,
+               edges=PAD_SAME,
+               batch_normalize=False,
+               name=PROVIDED):
+    """Adds a depth-wise convolution to the stack of operations.
+
+    The current head must be a rank 4 Tensor.
+
+    Args:
+      input_layer: The chainable object, supplied.
+      kernel: The size of the patch for the pool, either an int or a length 1 or
+        2 sequence (if length 1 or int, it is expanded).
+      channel_multiplier: Output channels will be a multiple of input channels.
+      activation_fn: A tuple of (activation_function, extra_parameters). Any
+        function that takes a tensor as its first argument can be used. More
+        common functions will have summaries added (e.g. relu).
+      stride: The strides as a length 1, 2 or 4 sequence or an integer. If an
+        int, length 1 or 2, the stride in the first and last dimensions are 1.
+      l2loss: Set to a value greater than 0 to use L2 regularization to decay
+        the weights.
+      init: An optional initialization. If not specified, uses Xavier
+        initialization.
+      stddev: A standard deviation to use in parameter initialization.
+      bias: Set to False to not have a bias.
+      bias_init: An initializer for the bias or a Tensor.
+      edges: Either SAME to use 0s for the out of bounds area or VALID to shrink
+        the output size and only uses valid input pixels.
+      batch_normalize: Supply a BatchNormalizationArguments to set the
+        parameters for batch normalization.
+      name: The name for this operation is also used to create/find the
+        parameter variables.
+    Returns:
+      Handle to the generated layer.
+    Raises:
+      ValueError: If head is not a rank 4 tensor or the depth of the input
+        (4th dim) is not known.
+    """
+    if input_layer.get_shape().ndims != 4:
+      raise ValueError(
+          'depthwise_conv2d requires a rank 4 Tensor with a known depth %s' %
+          input_layer.get_shape())
+    if input_layer.shape[3] is None:
+      raise ValueError('Input depth must be known')
+    kernel = _kernel(kernel)
+    stride = _stride(stride)
+    size = [kernel[0], kernel[1], input_layer.shape[3], channel_multiplier]
+
+    books = input_layer.bookkeeper
+    if init is None:
+      if stddev is None:
+        patch_size = size[0] * size[1]
+        init = layers.he_init(size[2] * patch_size, size[3] * patch_size,
+                              activation_fn)
+      else:
+        tf.logging.warning(
+            'Passing `stddev` to initialize weight variable is deprecated and '
+            'will be removed in the future. Pass '
+            'tf.truncated_normal_initializer(stddev=stddev) or '
+            'tf.zeros_initializer to `init` instead.')
+        if stddev:
+          init = tf.truncated_normal_initializer(stddev=stddev)
+        else:
+          init = tf.zeros_initializer
+    elif stddev is not None:
+      raise ValueError('Do not set both init and stddev.')
+    dtype = input_layer.tensor.dtype
+    params = self.variable('weights', size, init, dt=dtype)
+    y = tf.nn.depthwise_conv2d(input_layer, params, stride, edges)
+    layers.add_l2loss(books, params, l2loss)
+    if bias:
+      y += self.variable('bias', [input_layer.shape[3] * channel_multiplier],
+                         bias_init,
+                         dt=dtype)
+    books.add_scalar_summary(
+        tf.reduce_mean(layers.spatial_slice_zeros(y)),
+        '%s/zeros_spatial' % y.op.name)
+    y = pretty_tensor_normalization_methods.batch_normalize_with_arguments(
+        y, batch_normalize)
+    if activation_fn is not None:
+      if not isinstance(activation_fn, collections.Sequence):
+        activation_fn = (activation_fn,)
+      y = layers.apply_activation(books,
+                                  y,
+                                  activation_fn[0],
+                                  activation_args=activation_fn[1:])
     books.add_histogram_summary(y, '%s/activations' % y.op.name)
     return input_layer.with_tensor(y, parameters=self.vars)
 # pylint: enable=redefined-outer-name,invalid-name

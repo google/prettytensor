@@ -55,4 +55,5 @@ from prettytensor.pretty_tensor_class import VarStoreMethod
 from prettytensor.pretty_tensor_class import wrap
 from prettytensor.pretty_tensor_class import wrap_sequence
 
+from prettytensor.pretty_tensor_normalization_methods import BatchNormalizationArguments
 from prettytensor.scopes import make_template

@@ -16,6 +16,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import collections
 import math
 
 import tensorflow as tf
@@ -76,6 +77,41 @@ def add_l2loss(books, params, l2loss, name='weight_decay'):
     books.add_loss(
         tf.mul(tf.nn.l2_loss(params), l2loss, name=name),
         regularization=True, add_summaries=False)
+
+
+def he_init(n_inputs, n_outputs, activation_fn, uniform=True):
+  """Sets the parameter initialization using the method described.
+
+  This method is designed to keep the scale of the gradients roughly the same
+  in all layers with ReLU activations.
+
+  He et al. (2015):
+           Delving deep into rectifiers: surpassing human-level performance on
+           imageNet classification. International Conference on Computer Vision.
+
+  For activations other than ReLU and ReLU6, this method uses Xavier
+  initialization as in xavier_init().
+
+  Args:
+    n_inputs: The number of input nodes into each output.
+    n_outputs: The number of output nodes for each input.
+    activation_fn: Activation function used in this layer.
+    uniform: If uniform distribution will be used for Xavier initialization.
+             Normal distribution will be used if False.
+  Returns:
+    An initializer.
+  """
+  def in_relu_family(activation_fn):
+    if isinstance(activation_fn, collections.Sequence):
+      activation_fn = activation_fn[0]
+    return activation_fn in (tf.nn.relu, tf.nn.relu6)
+
+  if in_relu_family(activation_fn):
+    stddev = math.sqrt(2.0 / n_inputs)
+    # TODO(): Evaluates truncated_normal_initializer.
+    return tf.random_normal_initializer(stddev=stddev)
+  else:
+    return xavier_init(n_inputs, n_outputs, uniform)
 
 
 def xavier_init(n_inputs, n_outputs, uniform=True):

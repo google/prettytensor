@@ -261,7 +261,7 @@ Handle to this layer.
 
 - - -
 
-## <a name="batch_normalize"></a>batch_normalize(name=None, learned_moments_update_rate=None, variance_epsilon=None, scale_after_normalization=None, phase=Phase.train)
+## <a name="batch_normalize"></a>batch_normalize(name=None, learned_moments_update_rate=0.0003, variance_epsilon=0.001, scale_after_normalization=False, phase=Phase.train)
 
 
 
@@ -378,7 +378,7 @@ A new PrettyTensor.
 
 - - -
 
-## <a name="conv2d"></a>conv2d(kernel, depth, activation_fn=None, stride=None, l2loss=None, init=None, stddev=None, bias=True, bias_init=<function zeros_initializer at 0x394f9b0>, edges=SAME, batch_normalize=False, name=None)
+## <a name="conv2d"></a>conv2d(kernel, depth, activation_fn=None, stride=None, l2loss=None, init=None, stddev=None, bias=True, bias_init=<function zeros_initializer at 0x251986e0>, edges=SAME, batch_normalize=False, name=None)
 
 
 
@@ -406,7 +406,8 @@ The current head must be a rank 4 Tensor.
 * bias_init: An initializer for the bias or a Tensor.
 * edges: Either SAME to use 0s for the out of bounds area or VALID to shrink
  the output size and only uses valid input pixels.
-* batch_normalize: Set to True to batch_normalize this layer.
+* batch_normalize: Supply a BatchNormalizationArguments to set the
+ parameters for batch normalization.
 * name: The name for this operation is also used to create/find the
  parameter variables.
 
@@ -448,6 +449,53 @@ A loss.
 
 
 * ValueError: if labels is None or the type is not float or double.
+
+
+- - -
+
+## <a name="depthwise_conv2d"></a>depthwise_conv2d(kernel, channel_multiplier, activation_fn=None, stride=None, l2loss=None, init=None, stddev=None, bias=True, bias_init=<function zeros_initializer at 0x251986e0>, edges=SAME, batch_normalize=False, name=None)
+
+
+
+Adds a depth-wise convolution to the stack of operations.
+
+The current head must be a rank 4 Tensor.
+
+#### Args:
+
+
+* kernel: The size of the patch for the pool, either an int or a length 1 or
+ 2 sequence (if length 1 or int, it is expanded).
+* channel_multiplier: Output channels will be a multiple of input channels.
+* activation_fn: A tuple of (activation_function, extra_parameters). Any
+ function that takes a tensor as its first argument can be used. More
+ common functions will have summaries added (e.g. relu).
+* stride: The strides as a length 1, 2 or 4 sequence or an integer. If an
+ int, length 1 or 2, the stride in the first and last dimensions are 1.
+* l2loss: Set to a value greater than 0 to use L2 regularization to decay
+ the weights.
+* init: An optional initialization. If not specified, uses Xavier
+ initialization.
+* stddev: A standard deviation to use in parameter initialization.
+* bias: Set to False to not have a bias.
+* bias_init: An initializer for the bias or a Tensor.
+* edges: Either SAME to use 0s for the out of bounds area or VALID to shrink
+ the output size and only uses valid input pixels.
+* batch_normalize: Supply a BatchNormalizationArguments to set the
+ parameters for batch normalization.
+* name: The name for this operation is also used to create/find the
+ parameter variables.
+
+#### Returns:
+
+Handle to the generated layer.
+
+
+#### Raises:
+
+
+* ValueError: If head is not a rank 4 tensor or the depth of the input
+ (4th dim) is not known.
 
 
 - - -
@@ -648,7 +696,7 @@ A LayerWrapper with the flattened tensor.
 
 - - -
 
-## <a name="fully_connected"></a>fully_connected(size, activation_fn=None, l2loss=None, init=None, stddev=None, bias=True, bias_init=<function zeros_initializer at 0x394f9b0>, transpose_weights=False, name=None)
+## <a name="fully_connected"></a>fully_connected(size, activation_fn=None, l2loss=None, init=None, stddev=None, bias=True, bias_init=<function zeros_initializer at 0x251986e0>, transpose_weights=False, name=None)
 
 
 
@@ -1098,7 +1146,7 @@ Computes the softmax.
 
 - - -
 
-## <a name="softmax_classifier"></a>softmax_classifier(class_count, labels=None, name=None, loss_weight=None, per_example_weights=None, weight_init=None, bias_init=<function zeros_initializer at 0x394f9b0>)
+## <a name="softmax_classifier"></a>softmax_classifier(class_count, labels=None, name=None, loss_weight=None, per_example_weights=None, weight_init=None, bias_init=<function zeros_initializer at 0x251986e0>)
 
 
 
@@ -1129,7 +1177,7 @@ A tuple of the softmax's name and the loss tensor's name in m.bits.
 
 - - -
 
-## <a name="softmax_classifier_with_sampled_loss"></a>softmax_classifier_with_sampled_loss(num_classes, labels, num_sampled, num_true=None, sampled_values=None, remove_accidental_hits=True, loss_weight=None, per_example_weights=None, weight_init=None, bias_init=<function zeros_initializer at 0x394f9b0>, name=softmax_classifier)
+## <a name="softmax_classifier_with_sampled_loss"></a>softmax_classifier_with_sampled_loss(num_classes, labels, num_sampled, num_true=None, sampled_values=None, remove_accidental_hits=True, loss_weight=None, per_example_weights=None, weight_init=None, bias_init=<function zeros_initializer at 0x251986e0>, name=softmax_classifier)
 
 
 
@@ -1369,13 +1417,16 @@ Creates a scope for the defaults that are used in a `with` block.
 
 * `activation_fn`:
     * [conv2d](PrettyTensor.md#conv2d)
+    * [depthwise_conv2d](PrettyTensor.md#depthwise_conv2d)
     * [fully_connected](PrettyTensor.md#fully_connected)
 
 * `batch_normalize`:
     * [conv2d](PrettyTensor.md#conv2d)
+    * [depthwise_conv2d](PrettyTensor.md#depthwise_conv2d)
 
 * `l2loss`:
     * [conv2d](PrettyTensor.md#conv2d)
+    * [depthwise_conv2d](PrettyTensor.md#depthwise_conv2d)
     * [diagonal_matrix_mul](PrettyTensor.md#diagonal_matrix_mul)
     * [fully_connected](PrettyTensor.md#fully_connected)
 
@@ -1393,6 +1444,7 @@ Creates a scope for the defaults that are used in a `with` block.
 
 * `stddev`:
     * [conv2d](PrettyTensor.md#conv2d)
+    * [depthwise_conv2d](PrettyTensor.md#depthwise_conv2d)
     * [diagonal_matrix_mul](PrettyTensor.md#diagonal_matrix_mul)
     * [fully_connected](PrettyTensor.md#fully_connected)
     * [lstm_cell](PrettyTensor.md#lstm_cell)

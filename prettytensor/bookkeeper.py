@@ -112,7 +112,10 @@ class Bookkeeper(object):
     this point. Use `None` to disable summaries.
   """
 
-  def __init__(self, g=None, default_device=None, global_step=None):  # pylint: disable=redefined-outer-name
+  def __init__(self,
+               g=None,
+               default_device=None,
+               global_step=None):  # pylint: disable=redefined-outer-name
     """Creates a Bookkeeper.
 
     Args:
@@ -241,11 +244,10 @@ class Bookkeeper(object):
         tag = x.op.name
       elif _NAME_SCOPE_SEP not in tag:
         tag = self.g.unique_name(tag)
-      summary = (
-          tf.scalar_summary(
-              tag, x,
-              name='%s_summary' % tag,
-              collections=self.summary_collections))
+      summary = (tf.scalar_summary(tag,
+                                   x,
+                                   name='%s_summary' % tag,
+                                   collections=self.summary_collections))
       self.check_summary(tag)
       return summary
 
@@ -258,14 +260,21 @@ class Bookkeeper(object):
         tag = tensor.op.name
       elif _NAME_SCOPE_SEP not in tag:
         tag = self.g.unique_name(tag)
-      summary = tf.histogram_summary(tag, tensor,
+      summary = tf.histogram_summary(tag,
+                                     tensor,
                                      collections=self.summary_collections)
       self.check_summary(tag)
       return summary
 
-  def exponential_moving_average(
-      self, var, avg_var=None, decay=0.999, ignore_nan=False):
+  def exponential_moving_average(self,
+                                 var,
+                                 avg_var=None,
+                                 decay=0.999,
+                                 ignore_nan=False):
     """Calculates the exponential moving average.
+
+    TODO(): check if this implementation of moving average can now
+    be replaced by tensorflows implementation.
 
     Adds a variable to keep track of the exponential moving average and adds an
     update operation to the bookkeeper. The name of the variable is
@@ -290,23 +299,30 @@ class Bookkeeper(object):
         avg_name = '%s_average' % _bare_var_name(var)
         with tf.control_dependencies(None):
           with tf.name_scope(avg_name + '/Initializer/'):
-            init_val = tf.constant(0, dtype=var.dtype.base_dtype)
+            if isinstance(var, tf.Variable):
+              init_val = var.initialized_value()
+            elif var.get_shape().is_fully_defined():
+              init_val = tf.constant(0,
+                                     shape=var.get_shape(),
+                                     dtype=var.dtype.base_dtype)
+            else:
+              init_val = tf.constant(0, dtype=var.dtype.base_dtype)
           avg_var = tf.Variable(init_val, name=avg_name, trainable=False)
 
       num_updates = tf.cast(self.global_step, tf.float32)
-      decay = tf.maximum(
-          0.9, tf.minimum(decay, (1.0 + num_updates) / (10.0 + num_updates)))
+      decay = tf.minimum(decay, tf.maximum(0.9, (1.0 + num_updates) /
+                                           (10.0 + num_updates)))
       with tf.device(avg_var.device):
         if ignore_nan:
           var = tf.select(tf.is_finite(var), var, avg_var)
         if var.get_shape().is_fully_defined():
           avg_update = tf.assign_sub(avg_var, (1 - decay) * (avg_var - var))
         else:
-          avg_update = tf.assign(
-              avg_var, avg_var - (1 - decay) * (avg_var - var),
-              validate_shape=False)
+          avg_update = tf.assign(avg_var,
+                                 avg_var - (1 - decay) * (avg_var - var),
+                                 validate_shape=False)
       self._g.add_to_collection(GraphKeys.UPDATE_OPS, avg_update)
-      return avg_var
+      return avg_update
 
   def add_average_summary(self, var, tag=None, decay=0.999, ignore_nan=True):
     """Add a summary with the moving average of var.
@@ -334,8 +350,9 @@ class Bookkeeper(object):
     with self.g.as_default():
       if decay < 0.9 or decay >= 1.0:
         raise ValueError('Decay is %5.2f, but has to be in [0, 1).' % decay)
-      avg_var = self.exponential_moving_average(
-          var, decay=decay, ignore_nan=ignore_nan)
+      avg_var = self.exponential_moving_average(var,
+                                                decay=decay,
+                                                ignore_nan=ignore_nan)
       if tag is None:
         tag = _bare_var_name(avg_var)
       tag = self.g.unique_name(tag)
@@ -356,7 +373,7 @@ class Bookkeeper(object):
       add_summaries: Set to True if you want to see scalar and average summary.
     """
     # TODO(eiderman): Strip name out and just rely on the name scope.
-    _ = name   # Eliminates pylint warning.
+    _ = name  # Eliminates pylint warning.
     if regularization:
       self._g.add_to_collection(GraphKeys.REGULARIZATION_LOSSES, loss)
 
@@ -365,8 +382,11 @@ class Bookkeeper(object):
       self.add_scalar_summary(loss, 'loss')
       self.add_average_summary(loss, 'loss_average')
 
-  def create_composite_loss(
-      self, losses, regularize=True, include_marked=True, name='cost'):
+  def create_composite_loss(self,
+                            losses,
+                            regularize=True,
+                            include_marked=True,
+                            name='cost'):
     """Creates a loss that is the sum of all specified losses.
 
     Args:
@@ -446,56 +466,54 @@ class SimpleStateSaver(object):
   def _as_shape_proto(self, shape):
     return tf.TensorShape(shape).as_proto()
 
-  def AddState(self, state_name, dtype, shape):
+  def add_state(self, state_name, initial_state, batch_size=None):
     """Adds a state to the state saver.
 
     Args:
       state_name: The name of this state.
-      dtype: The tensorflow data type of the state.
-      shape: The shape of the state tensor. First dimension may be None to
-        indicate an unspecified batch size. When this happens, we silently
-        ignore it and assume a batch size of 1. For most compute graphs, the
-        resulting constant zero tensor will be broadcast to the correct shape
-        first time it is used in an arithmetic operation.
+      initial_state: The initial state vector. Only zeros are supported.
+      batch_size: The batch_size or None for unknown.
     """
-    state_shape = list(shape)
-    if state_shape[0] is None:
-      state_shape[0] = 1
-      # For the TensorShapeProto, we need to use "0" to indicate the batch
-      # size can be set at runtime - "None" cannot be stored in the proto.
-      shape_proto = self._as_shape_proto([0] + state_shape[1:])
+    state_shape = initial_state.get_shape().as_list()
+    full_shape = [batch_size] + state_shape
+    if not batch_size:
+      # TODO(): -1 is now reserved for unknown, so this should be
+      # updated, but that requires coordination with the binary and is
+      # checkpoint incompatible.
+      # TODO(eiderman): When we make the above breaking change, we should make
+      # the C++ client use the initial state instead of passing in zeros.
+      shape_proto = self._as_shape_proto([0] + state_shape)
+      batch_size = 1
     else:
-      shape_proto = self._as_shape_proto(state_shape)
+      shape_proto = self._as_shape_proto([batch_size] + state_shape)
 
     # Add a constant tensor of zeros. At training time, this will initialize
-    # the state with 0 - at inference time, this node is replaced by a feed.
-    try:
-      feed_op = tf.placeholder_with_default(
-          tf.zeros(dtype=dtype, shape=state_shape),
-          shape=shape, name='%s_feed' % state_name)
-    except AttributeError:
-      # TODO(eiderman): Remove this hack when placeholder_with_default hits a
-      # release.
-      feed_op = tf.zeros(dtype=dtype, shape=state_shape,
-                         name='%s_feed' % state_name)
+    # the state with the initial_state - at inference time,
+    # this node is replaced by a feed.
+    tiles = [batch_size] + ([1] * len(initial_state.get_shape()))
+    feed_op = tf.placeholder_with_default(
+        tf.tile(
+            tf.expand_dims(initial_state, [0]), tiles),
+        shape=full_shape,
+        name='%s_feed' % state_name)
     s = {'feed_op': feed_op,
-         'feed_type': dtype,
+         'feed_type': initial_state.dtype,
          'feed_shape': shape_proto}
     self._states[state_name] = s
 
   def state(self, state_name):
     if not self._states[state_name]:
-      raise ValueError('state %s not found - please call AddState() first.'
-                       % state_name)
+      raise ValueError('state %s not found - please call add_state() first.' %
+                       state_name)
     return self._states[state_name]['feed_op']
 
   def save_state(self, state_name, tensor):
     if not self._states[state_name]:
-      raise ValueError('state %s not found - please call AddState() first.'
-                       % state_name)
+      raise ValueError('state %s not found - please call add_state() first.' %
+                       state_name)
     elif 'fetch_name' in self._states[state_name]:
-      raise ValueError('save_state has already been called for state %s'
-                       % state_name)
+      raise ValueError('save_state has already been called for state %s' %
+                       state_name)
     self._states[state_name]['fetch_name'] = tensor.name
     return tf.no_op(name='%s_fetch' % state_name)
 
@@ -553,8 +571,10 @@ def global_step():
   return books.global_step
 
 
-def create_composite_loss(
-    losses=None, regularize=True, include_marked=True, name='cost'):
+def create_composite_loss(losses=None,
+                          regularize=True,
+                          include_marked=True,
+                          name='cost'):
   """Creates a loss that is the sum of all specified losses.
 
   Args:
@@ -566,12 +586,17 @@ def create_composite_loss(
     A single tensor that is the sum of all losses.
   """
   books = for_default_graph()
-  return books.create_composite_loss(
-      losses, regularize, include_marked=include_marked, name=name)
+  return books.create_composite_loss(losses,
+                                     regularize,
+                                     include_marked=include_marked,
+                                     name=name)
 
 
-def apply_optimizer(
-    optimizer, losses, regularize=True, include_marked=True, **kwargs):
+def apply_optimizer(optimizer,
+                    losses,
+                    regularize=True,
+                    include_marked=True,
+                    **kwargs):
   """Apply an optimizer to the graph and returns a train_op.
 
   The resulting operation will minimize the specified losses, plus the
@@ -607,8 +632,9 @@ def apply_optimizer(
   if 'global_step' not in kwargs:
     kwargs['global_step'] = books.global_step
   train_op = optimizer.minimize(
-      books.create_composite_loss(
-          losses=losses, regularize=regularize, include_marked=include_marked),
+      books.create_composite_loss(losses=losses,
+                                  regularize=regularize,
+                                  include_marked=include_marked),
       **kwargs)
   return books.with_update_ops(train_op)
 
@@ -622,7 +648,6 @@ def set_recurrent_state_saver(state_saver):
 def recurrent_state():
   books = for_default_graph()
   return books.recurrent_state
-
 
 # Set the factory.
 BOOKKEEPER_FACTORY = Bookkeeper  # pylint: disable=invalid-name

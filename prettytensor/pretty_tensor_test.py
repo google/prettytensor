@@ -250,16 +250,90 @@ class PrettyTensorTest(pretty_tensor_testing.PtTestCase):
     with self.assertRaises(ValueError):
       self.Wrap(input_data).conv2d([3, 3], 100)
 
+  def testDepthwiseConv(self):
+    # Fixes random number generator and uses a small standard deviation for
+    # initializing convolution weights.
+    rng = numpy.random.RandomState(1024)
+    std = 0.01
+    # Depthwise conv2d with input of depth 1 will produce identical result as
+    # conv2d.
+    pt1 = self.input_layer.reshape([DIM_SAME, DIM_SAME, DIM_SAME, 1])
+    weight_init = std * rng.randn(3, 3, 1, 2).astype(numpy.float32)
+    pt1 = pt1.depthwise_conv2d(3, 2, init=tf.constant_initializer(weight_init))
+    result_pt1 = self.RunTensor(pt1)
+
+    pt2 = self.input_layer.reshape([DIM_SAME, DIM_SAME, DIM_SAME, 1])
+    pt2 = pt2.conv2d(3, 2, init=tf.constant_initializer(weight_init))
+    result_pt2 = self.RunTensor(pt2)
+    testing.assert_allclose(result_pt1, result_pt2, rtol=TOLERANCE)
+
+    # Channel multiplier 3 depthwise conv2d with input of depth 2.
+    pt3 = self.input_layer.reshape([1, 3, 5, 2])
+    weight_init = std * rng.randn(3, 3, 2, 3).astype(numpy.float32)
+    pt3 = pt3.depthwise_conv2d(3, 3, init=tf.constant_initializer(weight_init))
+    result_pt3 = self.RunTensor(pt3)
+    self.assertEqual(result_pt3.shape, (1, 3, 5, 6))
+
+    # Reference conv2d with kernel shape (3, 3, 2, 3).
+    pt4 = self.input_layer.reshape([1, 3, 5, 2])
+    pt4 = pt4.conv2d(3, 3, init=tf.constant_initializer(weight_init))
+    result_pt4 = self.RunTensor(pt4)
+    self.assertEqual(result_pt4.shape, (1, 3, 5, 3))
+    # conv2d response should match the sum of corresponding depthwise conv2d
+    # response. Uses absolute tolerance here due to float32 precision.
+    for depth in range(3):
+      testing.assert_allclose(
+          result_pt4[..., depth],
+          result_pt3[..., depth] + result_pt3[..., 3 + depth],
+          atol=TOLERANCE)
+
   def testConvBatchNorm(self):
     st = self.input_layer.sequential()
     st.reshape([DIM_SAME, DIM_SAME, DIM_SAME, 1])
     with prettytensor.defaults_scope(batch_normalize=True,
                                      learned_moments_update_rate=0.0003,
                                      variance_epsilon=0.001,
-                                     scale_after_normalization=False):
+                                     scale_after_normalization=True):
       st.conv2d(3, 2)
     self.assertEqual(2,
                      len(tf.get_collection(prettytensor.GraphKeys.UPDATE_OPS)))
+    self.assertTrue(tf.get_collection(tf.GraphKeys.VARIABLES, '.*/beta'))
+    self.assertTrue(tf.get_collection(tf.GraphKeys.VARIABLES, '.*/gamma'))
+    self.assertTrue(tf.get_collection(
+        tf.GraphKeys.VARIABLES, '.*/moving_variance'))
+    self.assertTrue(tf.get_collection(tf.GraphKeys.VARIABLES, '.*/moving_mean'))
+
+  def testConvBatchNormArgumentOverride(self):
+    st = self.input_layer.sequential()
+    st.reshape([DIM_SAME, DIM_SAME, DIM_SAME, 1])
+    with prettytensor.defaults_scope(batch_normalize=True,
+                                     learned_moments_update_rate=0.0003,
+                                     variance_epsilon=0.001,
+                                     scale_after_normalization=True):
+      st.conv2d(3, 2,
+                batch_normalize=prettytensor.BatchNormalizationArguments(
+                    scale_after_normalization=False))
+    self.assertEqual(2,
+                     len(tf.get_collection(prettytensor.GraphKeys.UPDATE_OPS)))
+    self.assertTrue(tf.get_collection(tf.GraphKeys.VARIABLES, '.*/beta'))
+    self.assertFalse(tf.get_collection(tf.GraphKeys.VARIABLES, '.*/gamma'))
+    self.assertTrue(tf.get_collection(
+        tf.GraphKeys.VARIABLES, '.*/moving_variance'))
+    self.assertTrue(tf.get_collection(tf.GraphKeys.VARIABLES, '.*/moving_mean'))
+
+  def testBatchNormalizeUpdatesGraph(self):
+
+    x = prettytensor.wrap((numpy.arange(20)).reshape(10, 2).astype(
+        numpy.float32))
+    y = x.batch_normalize()
+
+    self.RunTensor(y)
+    mean = tf.get_collection(tf.GraphKeys.VARIABLES, '.*/moving_mean')[0]
+    var = tf.get_collection(tf.GraphKeys.VARIABLES, '.*/moving_variance')[0]
+
+    testing.assert_allclose([0.9, 1.], self.sess.run(mean), rtol=TOLERANCE)
+    testing.assert_allclose([4.200001, 4.200001],
+                            self.sess.run(var), rtol=TOLERANCE)
 
   def testConvBadShape(self):
     with self.assertRaises(ValueError):

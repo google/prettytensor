@@ -15,7 +15,6 @@ from __future__ import print_function
 
 import collections
 import math
-import numpy
 
 import six
 from six.moves import xrange  # pylint: disable=redefined-builtin
@@ -205,9 +204,12 @@ def unroll_state_saver(input_layer, name, state_shapes, template, lengths=None):
   state_saver = input_layer.bookkeeper.recurrent_state
   state_names = [STATE_NAME % name + '_%d' % i
                  for i in xrange(len(state_shapes))]
-  if isinstance(state_saver, bookkeeper.SimpleStateSaver):
+  if hasattr(state_saver, 'add_state'):
     for state_name, state_shape in zip(state_names, state_shapes):
-      state_saver.AddState(state_name, input_layer.dtype, state_shape)
+      initial_state = tf.zeros(state_shape[1:], dtype=input_layer.dtype)
+      state_saver.add_state(state_name,
+                            initial_state=initial_state,
+                            batch_size=state_shape[0])
   if lengths is not None:
     max_length = tf.reduce_max(lengths)
   else:
@@ -472,6 +474,8 @@ class embedding_lookup(prettytensor.VarStoreMethod):
     Raises:
       ValueError: If head is not a rank 2 Tensor with second dim of 1.
     """
+    if not hasattr(embedding_shape, '__iter__'):
+      raise ValueError('Embedding shape must be a tuple or list.')
     head = input_layer.tensor
     if len(input_layer.shape) == 2:
       if input_layer.shape[1] == 1:
@@ -553,13 +557,11 @@ class RecurrentRunner(object):
       if shape[0] == 0:
         shape[0] = batch_size
       feed_name = state['feed_op'].name
-      self._state_feeds[feed_name] = numpy.zeros(tuple(shape))
       self._state_feed_names.append(feed_name)
       self._state_fetches.append(state['fetch_name'])
 
   def reset(self):
-    self._state_feeds = {k: numpy.zeros_like(v)
-                         for k, v in six.iteritems(self._state_feeds)}
+    self._state_feeds = {}
 
   def run(self, fetch_list, feed_dict=None, sess=None):
     """Runs the graph with the provided feeds and fetches.
@@ -591,7 +593,6 @@ class RecurrentRunner(object):
 
     # Run the compute graph.
     fetches = sess.run(all_fetches_list, all_feeds_dict)
-
     # Update the feeds for the next time step.
     states = fetches[len(fetch_list):]
     for i, s in enumerate(states):

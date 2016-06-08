@@ -76,7 +76,7 @@ class Runner(object):
     """
     self._restore = restore
     self._save_path = save_path
-    self._var_count = -1
+    self._var_count = 0
 
     # Used primarily for testing.
     self._last_init = None
@@ -98,7 +98,7 @@ class Runner(object):
     self._follower = follower
 
   @contextlib.contextmanager
-  def session(self, master=''):
+  def session(self, master='', config=None):
     """Takes care of starting any local servers and stopping queues on exit.
 
     In general, the Runner is designed to work with any user provided session,
@@ -106,12 +106,13 @@ class Runner(object):
 
     Args:
       master: The master session to use.
+      config: A tf.ConfigProto or None.
 
     Yields:
       A session.
     """
     session_manager = SESSION_MANAGER_FACTORY()
-    with session_manager.prepare_session(master, None) as sess:
+    with session_manager.prepare_session(master, None, config=config) as sess:
       try:
         yield sess
       finally:
@@ -124,6 +125,7 @@ class Runner(object):
         tf.gfile.MakeDirs(save_dir)
       self._saver = tf.train.Saver(tf.all_variables(), max_to_keep=5)
       self._init = tf.initialize_all_variables()
+      self._local_init = tf.initialize_local_variables()
       self._check_inited = tf.assert_variables_initialized()
       self._var_count = len(tf.all_variables())
       if self._summary_writer:
@@ -138,6 +140,7 @@ class Runner(object):
       self._last_init = False
     except tf.errors.FailedPreconditionError:
       if allow_initialize:
+        self._local_init.run()
         if self._summary_writer:
           tf.train.write_graph(tf.get_default_graph().as_graph_def(),
                                self._logdir, 'graph.pbtxt')
@@ -146,6 +149,7 @@ class Runner(object):
       else:
         self._last_init = False
       if self._restore and self.load_from_checkpoint(sess):
+        self._local_init.run()
         self._last_restore = self._saver.last_checkpoints[-1]
       else:
         self._last_restore = None
@@ -178,6 +182,7 @@ class Runner(object):
     """
     # Set list of not-yet-deleted checkpoints.
     if self._save_path:
+      self._create_initializers()
       ckpt = tf.train.get_checkpoint_state(
           os.path.dirname(self._save_path), latest_filename)
       if ckpt and ckpt.all_model_checkpoint_paths:
@@ -256,7 +261,7 @@ class Runner(object):
 
     sess = tf.get_default_session()
     self.prepare_model(sess, allow_initialize=allow_initialize)
-
+    results = []
     try:
       for i, data in zip(xrange(num_steps), feed_data):
         log_this_time = print_every and i % print_every == 0

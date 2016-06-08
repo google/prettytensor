@@ -57,8 +57,18 @@ def _infer_unknown_dims(old_shape, shape_spec):
   denominator = 1
   unknowns = 0
 
+  normalized_shape_spec = []
+  for s in shape_spec:
+    # Equality of tf.Dimension is broken and upstream fix hasn't been accepted.
+    if isinstance(s, tf.Dimension):
+      normalized_shape_spec.append(s.value)
+    elif isinstance(s, tf.TensorShape):
+      for dim in s:
+        normalized_shape_spec.append(dim.value)
+    else:
+      normalized_shape_spec.append(s)
   result = []
-  for i, s in enumerate(shape_spec):
+  for i, s in enumerate(normalized_shape_spec):
     if s == DIM_SAME:
       if i >= len(old_shape):
         raise ValueError('%d exceeds the input shape' % i)
@@ -250,10 +260,16 @@ class diagonal_matrix_mul(prettytensor.VarStoreMethod):
     if init is None:
       if stddev is None:
         init = layers.xavier_init(size, 0)
-      elif stddev:
-        init = tf.truncated_normal_initializer(stddev=stddev)
       else:
-        init = tf.zeros_initializer
+        tf.logging.warning(
+            'Passing `stddev` to initialize weight variable is deprecated and '
+            'will be removed in the future. Pass '
+            'tf.truncated_normal_initializer(stddev=stddev) or '
+            'tf.zeros_initializer to `init` instead.')
+        if stddev:
+          init = tf.truncated_normal_initializer(stddev=stddev)
+        else:
+          init = tf.zeros_initializer
     param = self.variable('weights', [size], init)
     layers.add_l2loss(input_layer.bookkeeper, param, l2loss)
 
@@ -316,11 +332,17 @@ class fully_connected(prettytensor.VarStoreMethod):
     books = input_layer.bookkeeper
     if init is None:
       if stddev is None:
-        init = layers.xavier_init(in_size, size)
-      elif stddev:
-        init = tf.truncated_normal_initializer(stddev=stddev)
+        init = layers.he_init(in_size, size, activation_fn)
       else:
-        init = tf.zeros_initializer
+        tf.logging.warning(
+            'Passing `stddev` to initialize weight variable is deprecated and '
+            'will be removed in the future. Pass '
+            'tf.truncated_normal_initializer(stddev=stddev) or '
+            'tf.zeros_initializer to `init` instead.')
+        if stddev:
+          init = tf.truncated_normal_initializer(stddev=stddev)
+        else:
+          init = tf.zeros_initializer
     elif stddev is not None:
       raise ValueError('Do not set both init and stddev.')
     dtype = input_layer.tensor.dtype

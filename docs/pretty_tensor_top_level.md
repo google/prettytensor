@@ -5,6 +5,21 @@
 
 [TOC]
 - - -
+
+## BatchNormalizationArguments
+
+BatchNormalizationArguments(learned_moments_update_rate, variance_epsilon, scale_after_normalization)
+- - -
+
+### Properties
+
+* count
+* index
+* learned_moments_update_rate
+* scale_after_normalization
+* variance_epsilon
+
+- - -
 ## Class Bookkeeper
 
 [see details in Bookkeeper.md](Bookkeeper.md)
@@ -439,13 +454,16 @@ Creates a scope for the defaults that are used in a `with` block.
 
 * `activation_fn`:
     * [conv2d](PrettyTensor.md#conv2d)
+    * [depthwise_conv2d](PrettyTensor.md#depthwise_conv2d)
     * [fully_connected](PrettyTensor.md#fully_connected)
 
 * `batch_normalize`:
     * [conv2d](PrettyTensor.md#conv2d)
+    * [depthwise_conv2d](PrettyTensor.md#depthwise_conv2d)
 
 * `l2loss`:
     * [conv2d](PrettyTensor.md#conv2d)
+    * [depthwise_conv2d](PrettyTensor.md#depthwise_conv2d)
     * [diagonal_matrix_mul](PrettyTensor.md#diagonal_matrix_mul)
     * [fully_connected](PrettyTensor.md#fully_connected)
 
@@ -463,6 +481,7 @@ Creates a scope for the defaults that are used in a `with` block.
 
 * `stddev`:
     * [conv2d](PrettyTensor.md#conv2d)
+    * [depthwise_conv2d](PrettyTensor.md#depthwise_conv2d)
     * [diagonal_matrix_mul](PrettyTensor.md#diagonal_matrix_mul)
     * [fully_connected](PrettyTensor.md#fully_connected)
     * [lstm_cell](PrettyTensor.md#lstm_cell)
