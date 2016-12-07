@@ -75,8 +75,10 @@ def apply_activation(
 def add_l2loss(books, params, l2loss, name='weight_decay'):
   if l2loss:
     books.add_loss(
-        tf.mul(tf.nn.l2_loss(params), l2loss, name=name),
-        regularization=True, add_summaries=False)
+        tf.multiply(
+            tf.nn.l2_loss(params), l2loss, name=name),
+        regularization=True,
+        add_summaries=False)
 
 
 def he_init(n_inputs, n_outputs, activation_fn, uniform=True):

@@ -32,7 +32,8 @@ from prettytensor import local_trainer
 
 class LocalTrainerTest(unittest.TestCase):
 
-  def random_numpy(self, shape, dtype):
+  def random_numpy(self, shape, dtype, partition_info=None):
+    _ = partition_info
     if tf.float32.is_compatible_with(dtype):
       size = 1
       for n in shape:
@@ -56,10 +57,10 @@ class LocalTrainerTest(unittest.TestCase):
     self.softmax_result = (
         pt.wrap(self.input).fully_connected(2,
                                             activation_fn=tf.sigmoid,
-                                            init=self.random_numpy)
+                                            weights=self.random_numpy)
         .fully_connected(2,
                          activation_fn=None,
-                         init=self.random_numpy).softmax(self.target))
+                         weights=self.random_numpy).softmax(self.target))
     self.tmp_file = tempfile.mkdtemp()
 
   def tearDown(self):
@@ -95,7 +96,8 @@ class LocalTrainerTest(unittest.TestCase):
                          print_every=2)
     assert runner._saver.last_checkpoints, 'Expected checkpoints.'
     for x in runner._saver.last_checkpoints:
-      self.assertTrue(os.path.isfile(x), 'Promised file not saved: %s' % x)
+      self.assertTrue(tf.train.checkpoint_exists(x),
+                      'Promised file not saved: %s' % x)
       self.assertTrue(x.startswith(f), 'Name not as expected: %s' % x)
 
   def test_eval(self):
@@ -127,7 +129,7 @@ class LocalTrainerTest(unittest.TestCase):
       self.assertEquals(runner._saver.last_checkpoints, save_paths,
                         'No additional paths should have been saved.')
       self.assertFalse(runner._last_init)
-      self.assertEqual(accuracy, 0.5)
+      self.assertEqual(accuracy, [0.5])
 
       # Train the model to 100% accuracy.
       runner.train_model(train_op,
@@ -141,7 +143,7 @@ class LocalTrainerTest(unittest.TestCase):
       self.assertFalse(runner._last_init)
 
       # Make sure that the previous computation didn't impact this eval.
-      self.assertEqual(accuracy, 1.0)
+      self.assertEqual(accuracy, [1.0])
 
   def restore_helper(self, runner):
     with tf.Session():
@@ -168,6 +170,24 @@ class LocalTrainerTest(unittest.TestCase):
                         'No additional paths should have been saved.')
       self.assertFalse(runner._last_init)
 
+  def test_manual_save_restore(self):
+    runner = local_trainer.Runner()
+    f = os.path.join(self.tmp_file, 'manual.chkpt')
+
+    v = tf.Variable(tf.random_normal(shape=[100], dtype=tf.float32))
+
+    # Save it.
+    with runner.session() as sess:
+      runner.prepare_model(sess)  # Create variables
+      value = v.eval()  # Grab the variable
+      runner.saver.save(sess, f)
+
+    with runner.session() as sess:
+      # Restore the model
+      runner.saver.restore(sess, f)
+      new_value = v.eval()
+    numpy.testing.assert_array_equal(value, new_value)
+
   def test_restore(self):
     f = os.path.join(self.tmp_file, 'checkpoint')
     runner = local_trainer.Runner(save_path=f)
@@ -179,6 +199,25 @@ class LocalTrainerTest(unittest.TestCase):
     runner = local_trainer.Runner(save_path=f, restore=False)
     with self.assertRaises(tf.errors.FailedPreconditionError):
       self.restore_helper(runner)
+
+  def test_evaluate_without_initialize_error(self):
+    with tf.Graph().as_default():
+      runner = local_trainer.Runner()
+      tf.Variable(1)  # Put a variable in the graph.
+
+      with runner.session(), self.assertRaises(ValueError):
+        runner.evaluate_model(
+            self.softmax_result, 1, (self.input, self.target), self.xor_data)
+
+  def test_evaluate_repeatedly_one_time(self):
+    f = os.path.join(self.tmp_file, 'checkpoint')
+    runner = local_trainer.Runner(save_path=f)
+    self.restore_helper(runner)
+    local_variable = tf.Variable(22, collections=[tf.GraphKeys.LOCAL_VARIABLES])
+    accuracy = local_variable.assign_add(1)
+
+    answer = runner.evaluate_repeatedly(accuracy, 20, evaluation_times=1)
+    self.assertEqual([42], answer)
 
   def test_queues(self):
     qr = FakeQueueRunner()

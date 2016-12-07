@@ -63,6 +63,7 @@ class Runner(object):
                logdir=None,
                restore=True,
                coord=None,
+               initial_checkpoint=None,
                follower=False):
     """Create a Runner object that checkpoints to the given path.
 
@@ -72,11 +73,14 @@ class Runner(object):
         directory of save_path.
       restore: If False, disable restoring the model (force a fresh run).
       coord: The coordinator to use for threads.
+      initial_checkpoint: If not None, restore from the given checkpoint instead
+        of starting fresh.
       follower: True to make this wait for another session.
     """
     self._restore = restore
     self._save_path = save_path
     self._var_count = 0
+    self._initial_checkpoint = initial_checkpoint
 
     # Used primarily for testing.
     self._last_init = None
@@ -112,22 +116,25 @@ class Runner(object):
       A session.
     """
     session_manager = SESSION_MANAGER_FACTORY()
-    with session_manager.prepare_session(master, None, config=config) as sess:
+    # Initialization is handled manually at a later point and session_manager
+    # is just used for distributed compatibility.
+    with session_manager.prepare_session(master, None, config=config,
+                                         init_fn=lambda _: None) as sess:
       try:
         yield sess
       finally:
         self.stop_queues()
 
   def _create_initializers(self):
-    if self._var_count != len(tf.all_variables()):
+    if self._var_count != len(tf.global_variables()):
       save_dir = os.path.dirname(self._save_path) if self._save_path else None
       if save_dir and not tf.gfile.IsDirectory(save_dir):
         tf.gfile.MakeDirs(save_dir)
-      self._saver = tf.train.Saver(tf.all_variables(), max_to_keep=5)
-      self._init = tf.initialize_all_variables()
-      self._local_init = tf.initialize_local_variables()
+      self._saver = tf.train.Saver(tf.global_variables(), max_to_keep=5)
+      self._init = tf.global_variables_initializer()
+      self._local_init = tf.local_variables_initializer()
       self._check_inited = tf.assert_variables_initialized()
-      self._var_count = len(tf.all_variables())
+      self._var_count = len(tf.global_variables())
       if self._summary_writer:
         self._summaries = tf.merge_all_summaries()
         self._summary_writer.add_graph(tf.get_default_graph())
@@ -152,7 +159,12 @@ class Runner(object):
         self._local_init.run()
         self._last_restore = self._saver.last_checkpoints[-1]
       else:
-        self._last_restore = None
+        if self._initial_checkpoint:
+          self._local_init.run()
+          self._saver.restore(sess, self._initial_checkpoint)
+          self._last_restore = self._initial_checkpoint
+        else:
+          self._last_restore = None
 
   def prepare_model(self, sess, allow_initialize=True):
     """Initialize the model and if necessary launch the queue runners."""
@@ -168,6 +180,11 @@ class Runner(object):
       self._sess = sess
     self._start_threads(sess)
 
+  @property
+  def saver(self):
+    self._create_initializers()
+    return self._saver
+
   def load_from_checkpoint(self, sess, latest_filename=None):
     """Loads the model from the most recent checkpoint.
 
@@ -178,11 +195,11 @@ class Runner(object):
       latest_filename: The filename for the latest set of checkpoints, defaults
         to 'checkpoints'.
     Returns:
-      True if the model was restored from a checkpoint and False otherwise.
+      The loaded checkpoint or None if it failed to load.
     """
     # Set list of not-yet-deleted checkpoints.
+    self._create_initializers()
     if self._save_path:
-      self._create_initializers()
       ckpt = tf.train.get_checkpoint_state(
           os.path.dirname(self._save_path), latest_filename)
       if ckpt and ckpt.all_model_checkpoint_paths:
@@ -190,12 +207,11 @@ class Runner(object):
         # Manually configure a new Saver so that we get the latest snapshots.
         self._saver = tf.train.Saver(saver_def=self._saver.as_saver_def())
         self._saver.set_last_checkpoints(list(ckpt.all_model_checkpoint_paths))
-    self._create_initializers()
     if self._saver.last_checkpoints:
       self._saver.restore(sess, self._saver.last_checkpoints[-1])
       return self._saver.last_checkpoints[-1]
     else:
-      return False
+      return None
 
   def _log_and_save(self, sess, results):
     step = results[0]
@@ -243,7 +259,7 @@ class Runner(object):
     Args:
       op_list: A list of ops to run.
       num_steps: Number of steps to run this for.  If feeds are used, this is a
-        maximum.
+        maximum. `None` can be used to signal "forever".
       feed_vars: The variables to feed.
       feed_data: An iterator that feeds data tuples.
       print_every: Print a log line and checkpoing every so many steps.
@@ -262,8 +278,15 @@ class Runner(object):
     sess = tf.get_default_session()
     self.prepare_model(sess, allow_initialize=allow_initialize)
     results = []
+
     try:
-      for i, data in zip(xrange(num_steps), feed_data):
+      if num_steps is None:
+        counter = itertools.count(0)
+      elif num_steps >= 0:
+        counter = xrange(num_steps)
+      else:
+        raise ValueError('num_steps cannot be negative: %s' % num_steps)
+      for i, data in zip(counter, feed_data):
         log_this_time = print_every and i % print_every == 0
         if len(data) != len(feed_vars):
           raise ValueError(
@@ -291,7 +314,7 @@ class Runner(object):
       if print_every and not log_this_time:
         self._log_and_save(sess, results)
     except tf.errors.OutOfRangeError as ex:
-      print('Done training -- epoch limit reached %s' % ex)
+      print('Done training -- epoch limit reached %s' % ex.message)
       sys.stdout.flush()
       self.stop_queues()
     except BaseException as ex:
@@ -322,8 +345,8 @@ class Runner(object):
       `cost_to_log` from the final step.
     """
     costs = [train_op]
-    if (not isinstance(cost_to_log, six.string_types) and
-        hasattr(cost_to_log, '__iter__')):
+    if (isinstance(cost_to_log, collections.Sequence)
+        and not isinstance(cost_to_log, six.string_types)):
       costs.extend(cost_to_log)
     else:
       costs.append(cost_to_log)
@@ -338,7 +361,7 @@ class Runner(object):
     if test_vars:
       if test_vars != self._test_vars:
         self._test_vars = list(test_vars)
-        self._test_var_init_op = tf.initialize_variables(test_vars)
+        self._test_var_init_op = tf.variables_initializer(test_vars)
       return self._test_var_init_op.run()
 
   def evaluate_model(self,
@@ -365,6 +388,9 @@ class Runner(object):
       ValueError: If the wrong number of summary tags are provided or previously
         running QueueRunners haven't been stopped.
     """
+    if not hasattr(self, '_saver'):
+      raise ValueError('Before evaluating, you must initialize the model with '
+                       'load_from_checkpoint, prepare or saver.')
     self._run_init_test_vars_op()
     if (not isinstance(accuracy, collections.Sequence) or
         isinstance(accuracy, six.string_types)):
@@ -381,9 +407,12 @@ class Runner(object):
                             feed_data=feed_data,
                             print_every=print_every,
                             allow_initialize=False)
+    assert len(result) == len(accuracy) + 1, (
+        'results is wrong length, was %s but should be 1 longer than %s' %
+        (result, accuracy))
     if summary_tag:
       self.add_summaries(result[0], *zip(summary_tag, result[1:]))
-    return result[1]
+    return result[1:]
 
   def add_summaries(self, step, *tags_and_values):
     """Adds summaries to the writer and prints a log statement."""
@@ -411,6 +440,32 @@ class Runner(object):
         sys.stdout.flush()
         time.sleep(wait_time_seconds)
 
+  def load_new_checkpoint_when_available(
+      self, sess, current_checkpoint, sleep_seconds=10):
+    """Waits for a new checkpoint to be available and then loads it.
+
+    Args:
+      sess: The current session.
+      current_checkpoint: The current checkpoint or None to just load the next
+        one.
+      sleep_seconds: How long to sleep between checks.
+
+    Returns:
+      The next checkpoint to use.
+    """
+    # Load the checkpoint.
+    while True:
+      next_checkpoint = self.load_from_checkpoint(sess)
+      if not next_checkpoint or next_checkpoint == current_checkpoint:
+        print('Model not yet available, sleeping for %d seconds: '
+              'path %s; found: %s' %
+              (sleep_seconds,
+               os.path.dirname(self._save_path), current_checkpoint))
+        sys.stdout.flush()
+        time.sleep(sleep_seconds)
+      else:
+        return next_checkpoint
+
   def evaluate_repeatedly(self,
                           accuracy,
                           num_steps,
@@ -433,44 +488,32 @@ class Runner(object):
         published to this tag.
       evaluation_times: Run this loop for this many times or forever if it is
         `-1`.
+
+    Returns:
+      The final evaluation result from `evaluate_model` if `evaluation_times`
+      ever ends.
     """
-    i = 0
-    sess = tf.get_default_session()
-
-    current_checkpoint = self.load_from_checkpoint(sess)
-    while not current_checkpoint:
-      print('Model not yet available, sleeping for 10 seconds %s.' %
-            os.path.dirname(self._save_path))
-      sys.stdout.flush()
-      time.sleep(10)
-      current_checkpoint = self.load_from_checkpoint(sess)
-
-    # Create relevant ops before starting queue runners.
-    self._run_init_test_vars_op()
-
+    current_checkpoint = None
     try:
-      while True:
-        i += 1
-        accuracy_result = self.evaluate_model(accuracy,
-                                              num_steps,
-                                              summary_tag=summary_tag,
-                                              print_every=0,
-                                              feed_vars=feed_vars,
-                                              feed_data=feed_data)
-        if not summary_tag:
-          print('[%d] %s %g' % (sess.run(bookkeeper.global_step()),
-                                summary_tag,
-                                accuracy_result))
-        if i == evaluation_times:
-          break
-        while True:
-          next_checkpoint = self.load_from_checkpoint(sess)
-          if next_checkpoint == current_checkpoint:
-            time.sleep(10)
-          else:
-            break
+      for i in itertools.count(0):
+        # New session each time to reset queues - Yay.
+        with self.session() as sess:
+          current_checkpoint = self.load_new_checkpoint_when_available(
+              sess, current_checkpoint)
+          # Create relevant ops before starting queue runners.
+          self._run_init_test_vars_op()
 
-        current_checkpoint = next_checkpoint
+          accuracy_result = self.evaluate_model(accuracy,
+                                                num_steps,
+                                                summary_tag=summary_tag,
+                                                print_every=0,
+                                                feed_vars=feed_vars,
+                                                feed_data=feed_data)
+          if not summary_tag:
+            print('[%d] %s' % (sess.run(bookkeeper.global_step()),
+                               accuracy_result))
+          if (i + 1) == evaluation_times:
+            return accuracy_result
     finally:
       print('Shutting down')
       sys.stdout.flush()

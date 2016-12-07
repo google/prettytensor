@@ -40,52 +40,9 @@ Graphs can store data in graph keys for constructing the graph.
 * UPDATE_OPS
 
 - - -
+## Class Loss
 
-## Loss
-
-Wraps a layer to provide a handle to the tensor and disallows chaining.
-
-A loss can be used as a regular Tensor.  You can also call `mark_as_required`
-in order to put the loss into a collection. This is useful for auxilary heads
-and other multi-loss structures.
-
-- - -
-
-
-### <a name="get_shape"></a>get_shape()
-
-
-
-
-
-### <a name="is_sequence"></a>is_sequence()
-
-
-
-Losses are never sequences.
-
-
-
-
-
-
-### <a name="mark_as_required"></a>mark_as_required()
-
-
-
-Adds this loss to the MARKED_LOSSES collection.
-
-
-
-
-
-### Properties
-
-* dtype
-* name
-* shape
-* tensor
-
+[see details in Loss.md](Loss.md)
 - - -
 
 ## Phase
@@ -285,7 +242,7 @@ A TensorFlow tensor.
 
 - - -
 
-## <a name="apply_optimizer"></a>apply_optimizer(losses, regularize=True, include_marked=True)
+## <a name="apply_optimizer"></a>apply_optimizer(losses, regularize=True, include_marked=True, clip_gradients_by_norm=None)
 
 
 
@@ -316,6 +273,8 @@ specify it as GATE_NONE.
 * losses: A list of losses to apply.
 * regularize: Whether or not to include the regularization losses.
 * include_marked: Whether or not to use the marked losses.
+* clip_gradients_by_norm: If not None, clip gradients by the norm using
+ `tf.clip_by_norm`.
  **kwargs: Additional arguments to pass into the optimizer.
 
 #### Returns:
@@ -437,9 +396,13 @@ A single tensor that is the sum of all losses.
 
 ## <a name="defaults_scope"></a>defaults_scope(...
 
-defaults_scope(activation_fn=None, batch_normalize=None, l2loss=None, learned_moments_update_rate=None, phase=None, scale_after_normalization=None, stddev=None, summary_collections=None, trainable_variables=None, unroll=None, variable_collections=None, variance_epsilon=None)
+defaults_scope(activation_fn=None, batch_normalize=None, l2loss=None, learned_moments_update_rate=None, parameter_modifier=None, phase=None, scale_after_normalization=None, summary_collections=None, trainable_variables=None, unroll=None, variable_collections=None, variance_epsilon=None)
 
 Creates a scope for the defaults that are used in a `with` block.
+
+  Note: `defaults_scope` supports nesting where later defaults can be
+  overridden. Also, an explicitly given keyword argument on a method always
+  takes precedence.
 
   In addition to setting defaults for some methods, this also can control:
 
@@ -447,7 +410,7 @@ Creates a scope for the defaults that are used in a `with` block.
       disable with `None`.
   * `trainable_variables`: Boolean indicating if variables are trainable.
   * `variable_collections`: Default collections in which to place variables;
-      `tf.GraphKeys.VARIABLES` is always included.
+      `tf.GraphKeys.GLOBAL_VARIABLES` is always included.
 
   The supported defaults and methods that use them are:
 
@@ -470,22 +433,39 @@ Creates a scope for the defaults that are used in a `with` block.
 * `learned_moments_update_rate`:
     * [batch_normalize](PrettyTensor.md#batch_normalize)
 
-* `phase`:
-    * [batch_normalize](PrettyTensor.md#batch_normalize)
-    * [evaluate_precision_recall](PrettyTensor.md#evaluate_precision_recall)
-    * [evaluate_classifier](PrettyTensor.md#evaluate_classifier)
-    * [dropout](PrettyTensor.md#dropout)
-
-* `scale_after_normalization`:
-    * [batch_normalize](PrettyTensor.md#batch_normalize)
-
-* `stddev`:
+* `parameter_modifier`:
     * [conv2d](PrettyTensor.md#conv2d)
     * [depthwise_conv2d](PrettyTensor.md#depthwise_conv2d)
+    * [softmax_classifier_with_sampled_loss](PrettyTensor.md#softmax_classifier_with_sampled_loss)
+    * [softmax_classifier](PrettyTensor.md#softmax_classifier)
     * [diagonal_matrix_mul](PrettyTensor.md#diagonal_matrix_mul)
     * [fully_connected](PrettyTensor.md#fully_connected)
     * [lstm_cell](PrettyTensor.md#lstm_cell)
+    * [sequence_lstm](PrettyTensor.md#sequence_lstm)
     * [gru_cell](PrettyTensor.md#gru_cell)
+    * [sequence_gru](PrettyTensor.md#sequence_gru)
+    * [embedding_lookup](PrettyTensor.md#embedding_lookup)
+
+* `phase`:
+    * [batch_normalize](PrettyTensor.md#batch_normalize)
+    * [conv2d](PrettyTensor.md#conv2d)
+    * [depthwise_conv2d](PrettyTensor.md#depthwise_conv2d)
+    * [evaluate_precision_recall](PrettyTensor.md#evaluate_precision_recall)
+    * [evaluate_classifier_fraction](PrettyTensor.md#evaluate_classifier_fraction)
+    * [evaluate_classifier](PrettyTensor.md#evaluate_classifier)
+    * [evaluate_classifier_fraction_sparse](PrettyTensor.md#evaluate_classifier_fraction_sparse)
+    * [evaluate_classifier_sparse](PrettyTensor.md#evaluate_classifier_sparse)
+    * [dropout](PrettyTensor.md#dropout)
+    * [diagonal_matrix_mul](PrettyTensor.md#diagonal_matrix_mul)
+    * [fully_connected](PrettyTensor.md#fully_connected)
+    * [lstm_cell](PrettyTensor.md#lstm_cell)
+    * [sequence_lstm](PrettyTensor.md#sequence_lstm)
+    * [gru_cell](PrettyTensor.md#gru_cell)
+    * [sequence_gru](PrettyTensor.md#sequence_gru)
+    * [embedding_lookup](PrettyTensor.md#embedding_lookup)
+
+* `scale_after_normalization`:
+    * [batch_normalize](PrettyTensor.md#batch_normalize)
 
 * `unroll`:
     * [cleave_sequence](PrettyTensor.md#cleave_sequence)
@@ -572,6 +552,52 @@ Sets the state saver used for recurrent sequences.
 
 Starts a Pretty Tensor graph template.
 
+## Template Mode
+
+Templates allow you to define a graph with some unknown
+values. The most common use case is to leave the input undefined and then
+define a graph normally. The variables are only defined once the first time
+the graph is constructed.  For example:
+
+    template = (pretty_tensor.template('input')
+                .fully_connected(200, name='l1')
+                .fully_connected(200, name='l2'))
+    train_output = template.construct(input=train_data)
+
+    # All parameters are reused when the same template object is called again.
+    test_output = template.construct(input=test_data)
+
+Any argument to a pretty tensor method can be substituted by using an
+`UnboundVariable`.
+This allows you to parameterize a graph in arbitrary ways. The most cannonical
+usage would be to substitute a phase variable.
+
+    with pretty_tensor.defaults_scope(phase=UnboundVariable('train')):
+      # dropout uses train to optionaly disable itself.
+
+      template = (pretty_tensor.template('input')
+                  .fully_connected(200, name='l1')
+                  .fully_connected(200, name='l2')
+                  .dropout(.8))
+    train_output = template.construct(input=train_data, train=True)
+    test_output = template.construct(input=test_data, train=False)
+
+
+You should use caution because if a template is called with incompatible
+values (e.g. train and test using different widths), then it will break. This
+is because we guarantee variable reuse across instantiations.
+
+    template = (pretty_tensor.template('input')
+                .fully_connected(200, name='l1')
+                .fully_connected(
+                    pretty_tensor.UnboundVariable('width'), name='l2'))
+    train_output = template.construct(input=train_data, width=200)
+
+    # The following line will die because the shared parameter is the wrong
+    # size.
+    test_output = template.construct(input=test_data, width=100)
+
+
 A Layer in the resulting graph can be realized by calling
 `bind(key=value)` and then `construct`.
 
@@ -624,7 +650,8 @@ Creates an input layer representing the given tensor.
 
 
 * tensor: The tensor.
-* books: The bookkeeper.
+* books: The bookkeeper; this is usually not required unless you are building
+ multiple `tf.Graphs.`
 * tensor_shape: An optional shape that will be set on the Tensor or verified
  to match the tensor.
 

@@ -24,6 +24,7 @@ import tensorflow as tf
 from tensorflow.python.ops import control_flow_ops
 
 from prettytensor import bookkeeper
+from prettytensor import parameters
 from prettytensor import pretty_tensor_class as prettytensor
 from prettytensor.pretty_tensor_class import PROVIDED
 
@@ -57,6 +58,92 @@ class RecurrentResult(
     return self.__class__(flattened[0], tuple(flattened[1:]))
 
 
+def register_recurrent_cell(state_fn, **kwargs):
+  """Decorator to register the current cell function with auxiliary functions.
+
+  The only current auxauxiliaryilary function is `sequence_CELL_NAME` which
+  applies the cell function across a sequence.
+
+  Note, the cell_function must have arguments like:
+
+      cell_fn(input_, state_list, *args, **kwargs)
+
+  If it contains a field called 'lengths', then it is used to intelligently stop
+  long unrolls.
+
+  It will be registered as a compound op, please see `RegisterCompoundOp` for
+  details.
+
+  state_fn will then be called as:
+
+      state_fn(input_, *args, **kwargs)
+
+  Args:
+    state_fn: An function that returns a list of state tuples
+        `[(name, size_ex_batch)]`.
+    **kwargs: Arguments to pass forward to the registration methods.
+
+  Returns:
+    The actual decorator, which in turn returns the registered cell function.
+  """
+  def _fn(cell_fn):
+    """The register_recurrent_cell decorator."""
+    result = prettytensor.RegisterCompoundOp(**kwargs)(cell_fn)
+
+    method_name = kwargs.pop('method_name', cell_fn.__name__)
+    if method_name.endswith('_cell'):
+      method_name = method_name[:-5]
+    method_name = 'sequence_' + method_name
+
+    class _Sequence(prettytensor.VarStoreMethod):
+      """Expands a cell into a sequence version.
+
+      This holds an internal template to ensure that the same parameters are
+      used each time it is called.
+      """
+
+      def __init__(self):
+        super(self.__class__, self).__init__()
+        self.template = None
+
+      def __call__(self,
+                   input_layer,
+                   *args,
+                   **kwargs):
+        name = kwargs.pop('name', 'sequence')
+        lengths = kwargs.pop('lengths', None)
+        state_tuples = state_fn(input_layer, *args, **kwargs)
+        if not self.template:
+          template = prettytensor.template('input', input_layer.bookkeeper)
+          states = [prettytensor.UnboundVariable(s[0]) for s in state_tuples]
+          self.template = cell_fn(template, states, *args, **kwargs).as_fn(
+              'input', *[s[0] for s in state_tuples])
+
+        batch_size = input_layer.shape[0]
+        state_shapes = [[batch_size, s[1]] for s in state_tuples]
+        return unroll_state_saver(
+            input_layer, name, state_shapes, self.template, lengths)
+
+    doc_to_copy = result.__doc__
+    doc_to_copy = doc_to_copy[doc_to_copy.find('\n') + 2:]
+    doc = """Unrolls `{0}` over the input.
+
+  This takes an input that is a list of length timesteps where each element
+  is a `Tensor` of `[batch, *Dims]` and unrolls the recurrent cell. The input
+  and state to the cell are managed by this method, but the rest of the
+  arguments are passed through.
+
+    {1}""".format(cell_fn.__name__, doc_to_copy)
+    if hasattr(_Sequence.__call__, '__func__'):
+      _Sequence.__call__.__func__.__doc__ = doc
+    else:
+      _Sequence.__call__.__doc__ = doc
+    prettytensor.Register(method_name=method_name, **kwargs)(_Sequence)
+
+    return result
+  return _fn
+
+
 # LSTM and GRU cells are implemented as compound ops because they return
 # a tuple as a result.
 #
@@ -65,14 +152,21 @@ class RecurrentResult(
 #    (there can be only one).
 # 2. input_layer may be deferred, so they need to only use pretty tensor
 #    methods.
-@prettytensor.RegisterCompoundOp(assign_defaults='stddev')
+def _lstm_state_sizes(unused_input, num_units, *unused_args, **unused_kwargs):
+  return [('c', num_units), ('h', num_units)]
+
+
+@register_recurrent_cell(
+    state_fn=_lstm_state_sizes,
+    assign_defaults=('parameter_modifier', 'phase'))
 def lstm_cell(input_layer,
               states,
               num_units,
-              bias=True,
+              bias=tf.zeros_initializer,
               peephole=True,
-              stddev=None,
-              init=None):
+              weights=None,
+              phase=prettytensor.Phase.train,
+              parameter_modifier=parameters.identity):
   """Long short-term memory cell (LSTM).
 
   Args:
@@ -80,11 +174,13 @@ def lstm_cell(input_layer,
     states: The current state of the network, as
       [[batch, num_units], [batch, num_units]] (c, h).
     num_units: How big is the hidden state.
-    bias: Whether or not to use a bias.
+    bias: An initializer for the bias or a Tensor. No bias if set to None.
     peephole: Whether to use peephole connections as described in
         http://www.jmlr.org/papers/volume3/gers02a/gers02a.pdf
-    stddev: Standard deviation for Gaussian initialization of parameters.
-    init: A tf.*Initializer that is used to initialize the variables.
+    weights:  An initializer for weights or a Tensor.
+    phase: The phase of graph construction.  See `pt.Phase`.
+    parameter_modifier: A function to modify parameters that is applied after
+      creation and before use.
   Returns:
     A RecurrentResult.
   """
@@ -95,16 +191,19 @@ def lstm_cell(input_layer,
   else:
     layer = input_layer
   c, h = [prettytensor.wrap(state, layer.bookkeeper) for state in states]
-  activation_input = layer.fully_connected(4 * num_units,
-                                           bias=bias,
-                                           activation_fn=None,
-                                           stddev=stddev,
-                                           init=init)
+  activation_input = layer.fully_connected(
+      4 * num_units,
+      bias=bias,
+      activation_fn=None,
+      weights=weights,
+      parameter_modifier=parameter_modifier,
+      phase=phase)
   activation_h = h.fully_connected(4 * num_units,
-                                   bias=False,
+                                   bias=None,
                                    activation_fn=None,
-                                   stddev=stddev,
-                                   init=init)
+                                   weights=weights,
+                                   parameter_modifier=parameter_modifier,
+                                   phase=phase)
 
   activation = activation_input + activation_h
 
@@ -113,21 +212,26 @@ def lstm_cell(input_layer,
   i = split[0]
   j = split[1]
   f = split[2]
-  if bias:
+  if bias is not None:
     # Biases of the forget gate are initialized to 1 in order to reduce the
     # scale of forgetting in the beginning of the training.
     f += 1.
   o = split[3]
   if peephole:
     # TODO(eiderman): It would be worthwhile to determine the best initialization.
-    i += c.diagonal_matrix_mul(stddev=stddev, init=init)
-    f += c.diagonal_matrix_mul(stddev=stddev, init=init)
+    i += c.diagonal_matrix_mul(weights=weights,
+                               parameter_modifier=parameter_modifier,
+                               phase=phase)
+    f += c.diagonal_matrix_mul(weights=weights,
+                               parameter_modifier=parameter_modifier,
+                               phase=phase)
 
   f_gate = f.apply(tf.sigmoid, name='f_gate')
-  new_c = (
-      c * f_gate + i.apply(tf.sigmoid, name='i_gate') * j.apply(tf.tanh))
+  new_c = (c * f_gate + i.apply(tf.sigmoid, name='i_gate') * j.apply(tf.tanh))
   if peephole:
-    o += new_c.diagonal_matrix_mul(stddev=stddev, init=init)
+    o += new_c.diagonal_matrix_mul(weights=weights,
+                                   parameter_modifier=parameter_modifier,
+                                   phase=phase)
 
   new_h = new_c.apply(tf.tanh) * o.apply(tf.sigmoid, name='o_gate')
 
@@ -136,8 +240,20 @@ def lstm_cell(input_layer,
   return RecurrentResult(new_h, [new_c, new_h])
 
 
-@prettytensor.RegisterCompoundOp(assign_defaults='stddev')
-def gru_cell(input_layer, state, num_units, bias=True, stddev=None, init=None):
+def _gru_state_sizes(unused_input, num_units, *unused_args, **unused_kwargs):
+  return [('state', num_units)]
+
+
+@register_recurrent_cell(
+    state_fn=_gru_state_sizes,
+    assign_defaults=('parameter_modifier', 'phase'))
+def gru_cell(input_layer,
+             state,
+             num_units,
+             bias=tf.zeros_initializer,
+             weights=None,
+             phase=prettytensor.Phase.train,
+             parameter_modifier=parameters.identity):
   """Gated recurrent unit memory cell (GRU).
 
   Args:
@@ -145,9 +261,11 @@ def gru_cell(input_layer, state, num_units, bias=True, stddev=None, init=None):
     state: The current state of the network. For GRUs, this is a list with
       one element (tensor) of shape [batch, num_units].
     num_units: How big is the hidden state.
-    bias: Whether or not to use a bias.
-    stddev: Standard deviation for Gaussian initialization of parameters.
-    init: A tf.*Initializer that is used to initialize the variables.
+    bias: An initializer for the bias or a Tensor. No bias if set to None.
+    weights: An initializer for weights or a Tensor.
+    phase: The phase of graph construction.  See `pt.Phase`.
+    parameter_modifier: A function to modify parameters that is applied after
+      creation and before use.
   Returns:
     A RecurrentResult.
   """
@@ -158,22 +276,46 @@ def gru_cell(input_layer, state, num_units, bias=True, stddev=None, init=None):
   else:
     layer = input_layer
   # We start with bias of 1.0 to not reset and not udpate.
-  concat = layer.concat(1, [state]).fully_connected(2 * num_units,
-                                                    bias=bias,
-                                                    bias_init=1.0,
-                                                    activation_fn=None,
-                                                    stddev=stddev,
-                                                    init=init).apply(tf.sigmoid)
+  # NB We compute activation_input and activation_state in two different ops,
+  # instead of concatenating them, followed by one matrix multiplication. The
+  # reason is that input has size [batch_size x input_size], while state has
+  # [ ? x state_size ], where the first dimension is 1 initially and will be
+  # batch_size only after the first RNN computation. We thus cannot concatenate
+  # input and state, and instead add the results of two fully connected ops,
+  # which works thanks to broadcasting, independent of state's batch size.
+  state = state[0]
+  state_pt = prettytensor.wrap(state, layer.bookkeeper)
 
-  split = concat.split(1, 2)
+  activation_input = layer.fully_connected(
+      2 * num_units,
+      bias=None if bias is None else tf.constant_initializer(1.0),
+      activation_fn=None,
+      weights=weights,
+      phase=phase,
+      parameter_modifier=parameter_modifier)
+  activation_state = state_pt.fully_connected(
+      2 * num_units,
+      bias=None,
+      activation_fn=None,
+      weights=weights,
+      phase=phase,
+      parameter_modifier=parameter_modifier)
+
+  # adds batch_size x (2 * num_units) + ? x (2 * num_inputs)
+  activation = activation_input + activation_state
+  activation = activation.sigmoid()
+
+  split = activation.split(1, 2)
   r = split[0]
   u = split[1]
 
-  c = layer.concat(1, [r * state]).fully_connected(num_units,
-                                                   bias=bias,
-                                                   activation_fn=None,
-                                                   stddev=stddev,
-                                                   init=init).apply(tf.tanh)
+  c = layer.concat(1, [r * state]).fully_connected(
+      num_units,
+      bias=bias,
+      activation_fn=None,
+      weights=weights,
+      phase=phase,
+      parameter_modifier=parameter_modifier).apply(tf.tanh)
   new_h = u * state + (1 - u) * c
   if input_layer.is_sequential_builder():
     new_h = input_layer.set_head(input_layer)
@@ -220,10 +362,9 @@ def unroll_state_saver(input_layer, name, state_shapes, template, lengths=None):
   for state_name, state_shape in zip(state_names, state_shapes):
     my_shape = list(state_shape)
     my_shape[0] = -1
-    prev_states.append(
-        tf.reshape(state_saver.state(state_name), my_shape))
+    prev_states.append(tf.reshape(state_saver.state(state_name), my_shape))
 
-  parameters = None
+  my_parameters = None
   for i, layer in enumerate(input_layer.sequence):
     with input_layer.g.name_scope('unroll_%00d' % i):
       if i > 0 and max_length is not None:
@@ -240,8 +381,8 @@ def unroll_state_saver(input_layer, name, state_shapes, template, lengths=None):
         prev_states = result[1:]
       else:
         out, prev_states = template(layer, *prev_states)
-    if parameters is None:
-      parameters = out.layer_parameters
+    if my_parameters is None:
+      my_parameters = out.layer_parameters
     results.append(prettytensor.unwrap(out))
 
   updates = [state_saver.save_state(state_name, prettytensor.unwrap(prev_state))
@@ -251,124 +392,7 @@ def unroll_state_saver(input_layer, name, state_shapes, template, lengths=None):
   # evaluated by injecting a dependency on an arbitrary result.
   with tf.control_dependencies(updates):
     results[0] = tf.identity(results[0])
-  return input_layer.with_sequence(results, parameters=parameters)
-
-
-# pylint: disable=invalid-name
-@prettytensor.Register
-class sequence_lstm(prettytensor.VarStoreMethod):
-  """The Sequence Lstm.
-
-  This holds an internal template to insure that the same parameters are used
-  each time it is called.
-  """
-
-  def __init__(self):
-    super(self.__class__, self).__init__()
-    self.template = None
-
-  def __call__(self,
-               input_layer,
-               num_units,
-               bias=True,
-               peephole=True,
-               name=PROVIDED,
-               stddev=None,
-               init=None,
-               lengths=None):
-    """Creates an unrolled LSTM to process sequence data.
-
-    The initial state is drawn from the bookkeeper's recurrent state and if it
-    supports state saving, then it is saved.
-
-    Args:
-      input_layer: PrettyTensor (provided).
-      num_units: Number of nodes in the hidden states and the output size.
-      bias: Whether or not to use a bias.
-      peephole: Whether to use peephole connections.
-      name: The name of this layer.
-      stddev: Standard deviation for Gaussian initialization of parameters.
-      init: A tf.*Initializer that is used to initialize the variables.
-      lengths: An optional Tensor that encodes a length for each item in the
-        minibatch. This is used to truncate computation.
-    Returns:
-      A sequence with the result at each timestep.
-    Raises:
-      ValueError: if head is not a sequence, the shape is not rank 2 or the
-        number of nodes (second dim) is not known.
-    """
-    if not self.template:
-      lstm_template = prettytensor.template('input', input_layer.bookkeeper)
-      names = ['c', 'h']
-      states = [prettytensor.UnboundVariable(n) for n in names]
-      # TODO(eiderman): Move this to pt.make_template() when it is ready.
-      self.template = lstm_template.lstm_cell(states=states,
-                                              num_units=num_units,
-                                              bias=bias,
-                                              peephole=peephole,
-                                              stddev=stddev,
-                                              init=init).as_fn('input', *names)
-
-    batch_size = input_layer.shape[0]
-    state_shapes = [[batch_size, num_units],
-                    [batch_size, num_units]]
-    return unroll_state_saver(input_layer, name, state_shapes, self.template,
-                              lengths)
-
-
-# pylint: disable=invalid-name
-@prettytensor.Register
-class sequence_gru(prettytensor.VarStoreMethod):
-  """The Sequence Gru.
-
-  This holds an internal template to insure that the same parameters are used
-  each time it is called.
-  """
-
-  def __init__(self):
-    super(self.__class__, self).__init__()
-    self.template = None
-
-  def __call__(self,
-               input_layer,
-               num_units,
-               bias=True,
-               name=PROVIDED,
-               stddev=None,
-               init=None,
-               lengths=None):
-    """Creates an unrolled GRU to process sequence data.
-
-    The initial state is drawn from the bookkeeper's recurrent state and if it
-    supports state saving, then it is saved.
-
-    Args:
-      input_layer: PrettyTensor (provided).
-      num_units: Number of units in the hidden states.
-      bias: Whether or not to use a bias.
-      name: The name of this layer.
-      stddev: Standard deviation for Gaussian initialization of parameters.
-      init: A tf.*Initializer that is used to initialize the variables.
-      lengths: An optional Tensor that encodes a length for each item in the
-        minibatch. This is used to truncate computation.
-    Returns:
-      A sequence with the result at each timestep.
-    Raises:
-      ValueError: if head is not a sequence, the shape is not rank 2 or the
-        number of nodes (second dim) is not known.
-    """
-    if not self.template:
-      gru_template = prettytensor.template('input', input_layer.bookkeeper)
-      self.template = gru_template.gru_cell(
-          prettytensor.UnboundVariable('state'),
-          num_units,
-          bias=bias,
-          stddev=stddev,
-          init=init).as_fn('input', 'state')
-
-    batch_size = input_layer.shape[0]
-    return unroll_state_saver(input_layer, name, [(batch_size, num_units)],
-                              self.template, lengths)
+  return input_layer.with_sequence(results, parameters=my_parameters)
 
 
 @prettytensor.Register
@@ -439,15 +463,17 @@ def cleave_sequence(input_layer, unroll=None):
 
 
 # pylint: disable=invalid-name
-@prettytensor.Register
+@prettytensor.Register(assign_defaults=('parameter_modifier', 'phase'))
 class embedding_lookup(prettytensor.VarStoreMethod):
 
   def __call__(self,
                input_layer,
                embedding_count,
                embedding_shape,
-               name=PROVIDED,
-               init=None):
+               weights=None,
+               phase=prettytensor.Phase.train,
+               parameter_modifier=parameters.identity,
+               name=PROVIDED):
     """Looks up values in a learned embedding lookup.
 
     `embedding_count` embedding tensors are created each with shape
@@ -466,13 +492,16 @@ class embedding_lookup(prettytensor.VarStoreMethod):
       input_layer: PrettyTensor (provided).
       embedding_count: Number of items in the embedding.
       embedding_shape: Shape of each embedding.
-      name: The name of this layer.
-      init: tf.*Initializer to use for initializing the input or a Tensor.
+      weights: tf.*Initializer to use for initializing the input or a Tensor.
         Defaults to a truncated normal.
+      phase: The phase of graph construction.  See `pt.Phase`.
+      parameter_modifier: A function to modify parameters that is applied after
+        creation and before use.
+      name: The name of this layer.
     Returns:
       input_layer
     Raises:
-      ValueError: If head is not a rank 2 Tensor with second dim of 1.
+      ValueError: If input_layer is not a rank 2 Tensor with second dim of 1.
     """
     if not hasattr(embedding_shape, '__iter__'):
       raise ValueError('Embedding shape must be a tuple or list.')
@@ -483,16 +512,19 @@ class embedding_lookup(prettytensor.VarStoreMethod):
       else:
         raise ValueError('Last dim of shape must be 1: %s' % input_layer.shape)
     else:
-      raise ValueError('head must be a rank 2 Tensor: %s' % input_layer.shape)
+      raise ValueError('Requires a rank 2 Tensor: %s' % input_layer.shape)
     full_shape = [embedding_count]
     full_shape.extend(embedding_shape)
-    if init is None:
+    if weights is None:
       size = 1
       for dim in embedding_shape:
         size *= dim
-      init = tf.truncated_normal_initializer(stddev=1. / math.sqrt(size))
+      weights = tf.truncated_normal_initializer(stddev=1. / math.sqrt(size))
 
-    embeddings = self.variable('params', full_shape, init=init)
+    embeddings = parameter_modifier(
+        'params',
+        self.variable('params', full_shape, init=weights),
+        phase)
 
     name = 'params_1' if name == 'params' else name
     return input_layer.with_tensor(

@@ -18,6 +18,7 @@ import collections
 import tensorflow as tf
 
 from prettytensor import layers
+from prettytensor import parameters
 from prettytensor import pretty_tensor_class as prettytensor
 from prettytensor import pretty_tensor_normalization_methods
 from prettytensor.pretty_tensor_class import PAD_SAME
@@ -40,7 +41,20 @@ def _pool(input_layer, pool_fn, kernel, stride, edges, name):
 
 @prettytensor.Register
 def average_pool(input_layer, kernel, stride, edges=PAD_SAME, name=PROVIDED):
-  """Performs average pooling. The current head must be a rank 4 Tensor.
+  """Performs average pooling.
+
+  `kernel` is the patch that will be pooled and it describes the pooling along
+  each of the 4 dimensions.  `stride` is how big to take each step.
+
+  Because more often than not, pooling is only done
+  on the width and height of the image, the following shorthands are supported:
+
+  * scalar (e.g. 3): Square pooling on the image
+      (`[b, c, r, d] = [1, 3, 3, 1]`).
+  * singleton list (e.g. [3]): Square pooling on the image
+      (`[b, c, r, d] = [1, 3, 3, 1]`).
+  * list of length 2 (e.g. [3, 2]): Square pooling on the image
+      (`[b, c, r, d] = [1, 3, 2, 1]`).
 
   Args:
     input_layer: The chainable object, supplied.
@@ -48,7 +62,7 @@ def average_pool(input_layer, kernel, stride, edges=PAD_SAME, name=PROVIDED):
       2 sequence (if length 1 or int, it is expanded).
     stride: The strides as a length 1, 2 or 4 sequence or an integer. If an
       int, length 1 or 2, the stride in the first and last dimensions are 1.
-    edges: Either PAD_SAME' or PAD_VALID to control the padding.
+    edges: Either `pt.PAD_SAME`' or `pt.PAD_VALID` to control the padding.
     name: The name for this operation is also used to create/find the
       parameter variables.
   Returns:
@@ -59,7 +73,20 @@ def average_pool(input_layer, kernel, stride, edges=PAD_SAME, name=PROVIDED):
 
 @prettytensor.Register
 def max_pool(input_layer, kernel, stride, edges=PAD_SAME, name=PROVIDED):
-  """Performs max pooling. The current head must be a rank 4 Tensor.
+  """Performs max pooling.
+
+  `kernel` is the patch that will be pooled and it describes the pooling along
+  each of the 4 dimensions.  `stride` is how big to take each step.
+
+  Because more often than not, pooling is only done
+  on the width and height of the image, the following shorthands are supported:
+
+  * scalar (e.g. 3): Square pooling on the image
+      (`[b, c, r, d] = [1, 3, 3, 1]`).
+  * singleton list (e.g. [3]): Square pooling on the image
+      (`[b, c, r, d] = [1, 3, 3, 1]`).
+  * list of length 2 (e.g. [3, 2]): Square pooling on the image
+      (`[b, c, r, d] = [1, 3, 2, 1]`).
 
   Args:
     input_layer: The chainable object, supplied.
@@ -67,7 +94,7 @@ def max_pool(input_layer, kernel, stride, edges=PAD_SAME, name=PROVIDED):
       2 sequence (if length 1 or int, it is expanded).
     stride: The strides as a length 1, 2 or 4 sequence or an integer. If an
       int, length 1 or 2, the stride in the first and last dimensions are 1.
-    edges: Either PAD_SAME or PAD_VALID to control the padding.
+    edges: Either `pt.PAD_SAME` or `pt.PAD_VALID` to control the padding.
     name: The name for this operation is also used to create/find the
       parameter variables.
   Returns:
@@ -76,9 +103,35 @@ def max_pool(input_layer, kernel, stride, edges=PAD_SAME, name=PROVIDED):
   return _pool(input_layer, tf.nn.max_pool, kernel, stride, edges, name)
 
 
+@prettytensor.Register
+def bilinear_sampling(input_layer, x, y, name=PROVIDED):
+  """Performs bilinear sampling. This must be a rank 4 Tensor.
+
+  Implements the differentiable sampling mechanism with bilinear kernel
+  in https://arxiv.org/abs/1506.02025.
+
+  Given (x, y) coordinates for each output pixel, use bilinear sampling on
+  the input_layer to fill the output.
+
+  Args:
+    input_layer: The chainable object, supplied.
+    x: A tensor of size [batch_size, height, width, 1] representing the sampling
+      x coordinates normalized to range [-1,1].
+    y: A tensor of size [batch_size, height, width, 1] representing  the
+      sampling y coordinates normalized to range [-1,1].
+    name: The name for this operation is also used to create/find the
+      parameter variables.
+  Returns:
+    Handle to this layer
+  """
+  input_layer.get_shape().assert_has_rank(4)
+  return _interpolate(im=input_layer, x=x, y=y, name=name)
+
+
 # pylint: disable=redefined-outer-name,invalid-name
 @prettytensor.Register(
-    assign_defaults=('activation_fn', 'l2loss', 'stddev', 'batch_normalize'))
+    assign_defaults=('activation_fn', 'l2loss', 'batch_normalize',
+                     'parameter_modifier', 'phase'))
 class conv2d(prettytensor.VarStoreMethod):
 
   def __call__(self,
@@ -86,18 +139,26 @@ class conv2d(prettytensor.VarStoreMethod):
                kernel,
                depth,
                activation_fn=None,
-               stride=None,
+               stride=(1, 1),
                l2loss=None,
-               init=None,
-               stddev=None,
-               bias=True,
-               bias_init=tf.zeros_initializer,
+               weights=None,
+               bias=tf.zeros_initializer,
                edges=PAD_SAME,
                batch_normalize=False,
+               phase=prettytensor.Phase.train,
+               parameter_modifier=parameters.identity,
                name=PROVIDED):
     """Adds a convolution to the stack of operations.
 
-    The current head must be a rank 4 Tensor.
+    `kernel` is the patch that will be pooled and it describes the pooling
+    along each of the 4 dimensions.  The stride is how big to take each step.
+
+    * scalar (e.g. 3): Square pooling on the image
+        (`[b, c, r, d] = [1, 3, 3, 1]`).
+    * singleton list (e.g. [3]): Square pooling on the image
+        (`[b, c, r, d] = [1, 3, 3, 1]`).
+    * list of length 2 (e.g. [3, 2]): Square pooling on the image
+        (`[b, c, r, d] = [1, 3, 2, 1]`).
 
     Args:
       input_layer: The chainable object, supplied.
@@ -111,22 +172,23 @@ class conv2d(prettytensor.VarStoreMethod):
         int, length 1 or 2, the stride in the first and last dimensions are 1.
       l2loss: Set to a value greater than 0 to use L2 regularization to decay
         the weights.
-      init: An optional initialization. If not specified, uses Xavier
-        initialization.
-      stddev: A standard deviation to use in parameter initialization.
-      bias: Set to False to not have a bias.
-      bias_init: An initializer for the bias or a Tensor.
+      weights:  An initializer for weights or a Tensor. If not specified,
+        uses He's initialization.
+      bias: An initializer for the bias or a Tensor. No bias if set to None.
       edges: Either SAME to use 0s for the out of bounds area or VALID to shrink
         the output size and only uses valid input pixels.
       batch_normalize: Supply a BatchNormalizationArguments to set the
         parameters for batch normalization.
+      phase: The phase of graph construction.  See `pt.Phase`.
+      parameter_modifier: A function to modify parameters that is applied after
+        creation and before use.
       name: The name for this operation is also used to create/find the
         parameter variables.
     Returns:
       Handle to the generated layer.
     Raises:
-      ValueError: If head is not a rank 4 tensor or the  depth of the input
-        (4th dim) is not known.
+      ValueError: If input_layer is not a rank 4 tensor or the  depth of the
+        input (4th dim) is not known.
     """
     if input_layer.get_shape().ndims != 4:
       raise ValueError('conv2d requires a rank 4 Tensor with a known depth %s' %
@@ -138,29 +200,24 @@ class conv2d(prettytensor.VarStoreMethod):
     size = [kernel[0], kernel[1], input_layer.shape[3], depth]
 
     books = input_layer.bookkeeper
-    if init is None:
-      if stddev is None:
-        patch_size = size[0] * size[1]
-        init = layers.he_init(size[2] * patch_size, size[3] * patch_size,
-                              activation_fn)
-      else:
-        tf.logging.warning(
-            'Passing `stddev` to initialize weight variable is deprecated and '
-            'will be removed in the future. Pass '
-            'tf.truncated_normal_initializer(stddev=stddev) or '
-            'tf.zeros_initializer to `init` instead.')
-        if stddev:
-          init = tf.truncated_normal_initializer(stddev=stddev)
-        else:
-          init = tf.zeros_initializer
-    elif stddev is not None:
-      raise ValueError('Do not set both init and stddev.')
+    if weights is None:
+      patch_size = size[0] * size[1]
+      weights = layers.he_init(size[2] * patch_size, size[3] * patch_size,
+                               activation_fn)
+
     dtype = input_layer.tensor.dtype
-    params = self.variable('weights', size, init, dt=dtype)
+    params = parameter_modifier(
+        'weights',
+        self.variable('weights', size, weights, dt=dtype),
+        phase)
     y = tf.nn.conv2d(input_layer, params, stride, edges)
     layers.add_l2loss(books, params, l2loss)
-    if bias:
-      y += self.variable('bias', [size[-1]], bias_init, dt=dtype)
+    if bias is not None:
+      y += parameter_modifier('bias',
+                              self.variable('bias', [size[-1]],
+                                            bias,
+                                            dt=dtype),
+                              phase)
     books.add_scalar_summary(
         tf.reduce_mean(layers.spatial_slice_zeros(y)),
         '%s/zeros_spatial' % y.op.name)
@@ -178,7 +235,8 @@ class conv2d(prettytensor.VarStoreMethod):
 
 
 @prettytensor.Register(
-    assign_defaults=('activation_fn', 'l2loss', 'stddev', 'batch_normalize'))
+    assign_defaults=('activation_fn', 'l2loss', 'batch_normalize',
+                     'parameter_modifier', 'phase'))
 class depthwise_conv2d(prettytensor.VarStoreMethod):
 
   def __call__(self,
@@ -188,16 +246,27 @@ class depthwise_conv2d(prettytensor.VarStoreMethod):
                activation_fn=None,
                stride=None,
                l2loss=None,
-               init=None,
-               stddev=None,
-               bias=True,
-               bias_init=tf.zeros_initializer,
+               weights=None,
+               bias=tf.zeros_initializer,
                edges=PAD_SAME,
                batch_normalize=False,
+               phase=prettytensor.Phase.train,
+               parameter_modifier=parameters.identity,
                name=PROVIDED):
     """Adds a depth-wise convolution to the stack of operations.
 
-    The current head must be a rank 4 Tensor.
+    A depthwise convolution performs the convolutions one channel at a time and
+    produces an output with depth `channel_multiplier * input_depth`.
+
+    `kernel` is the patch that will be pooled and it describes the pooling
+    along each of the 4 dimensions.  The stride is how big to take each step.
+
+    * scalar (e.g. 3): Square pooling on the image
+        (`[b, c, r, d] = [1, 3, 3, 1]`).
+    * singleton list (e.g. [3]): Square pooling on the image
+        (`[b, c, r, d] = [1, 3, 3, 1]`).
+    * list of length 2 (e.g. [3, 2]): Square pooling on the image
+        (`[b, c, r, d] = [1, 3, 2, 1]`).
 
     Args:
       input_layer: The chainable object, supplied.
@@ -211,22 +280,24 @@ class depthwise_conv2d(prettytensor.VarStoreMethod):
         int, length 1 or 2, the stride in the first and last dimensions are 1.
       l2loss: Set to a value greater than 0 to use L2 regularization to decay
         the weights.
-      init: An optional initialization. If not specified, uses Xavier
-        initialization.
-      stddev: A standard deviation to use in parameter initialization.
-      bias: Set to False to not have a bias.
-      bias_init: An initializer for the bias or a Tensor.
-      edges: Either SAME to use 0s for the out of bounds area or VALID to shrink
-        the output size and only uses valid input pixels.
+      weights:  An initializer for weights or a Tensor. If not specified,
+        uses He's initialization.
+      bias: An initializer for the bias or a Tensor. No bias if set to None.
+      edges: Either `pt.DIM_SAME` to use 0s for the out of bounds area or
+        `pt.DIM_VALID` to shrink the output size and only uses valid input
+        pixels.
       batch_normalize: Supply a BatchNormalizationArguments to set the
         parameters for batch normalization.
+      phase: The phase of graph construction.  See `pt.Phase`.
+      parameter_modifier: A function to modify parameters that is applied after
+        creation and before use.
       name: The name for this operation is also used to create/find the
         parameter variables.
     Returns:
       Handle to the generated layer.
     Raises:
-      ValueError: If head is not a rank 4 tensor or the depth of the input
-        (4th dim) is not known.
+      ValueError: If input_layer is not a rank 4 tensor or the depth of the
+        input (4th dim) is not known.
     """
     if input_layer.get_shape().ndims != 4:
       raise ValueError(
@@ -239,31 +310,25 @@ class depthwise_conv2d(prettytensor.VarStoreMethod):
     size = [kernel[0], kernel[1], input_layer.shape[3], channel_multiplier]
 
     books = input_layer.bookkeeper
-    if init is None:
-      if stddev is None:
-        patch_size = size[0] * size[1]
-        init = layers.he_init(size[2] * patch_size, size[3] * patch_size,
-                              activation_fn)
-      else:
-        tf.logging.warning(
-            'Passing `stddev` to initialize weight variable is deprecated and '
-            'will be removed in the future. Pass '
-            'tf.truncated_normal_initializer(stddev=stddev) or '
-            'tf.zeros_initializer to `init` instead.')
-        if stddev:
-          init = tf.truncated_normal_initializer(stddev=stddev)
-        else:
-          init = tf.zeros_initializer
-    elif stddev is not None:
-      raise ValueError('Do not set both init and stddev.')
+    if weights is None:
+      patch_size = size[0] * size[1]
+      weights = layers.he_init(size[2] * patch_size, size[3] * patch_size,
+                               activation_fn)
+
     dtype = input_layer.tensor.dtype
-    params = self.variable('weights', size, init, dt=dtype)
+    params = parameter_modifier(
+        'weights',
+        self.variable('weights', size, weights, dt=dtype),
+        phase)
     y = tf.nn.depthwise_conv2d(input_layer, params, stride, edges)
     layers.add_l2loss(books, params, l2loss)
-    if bias:
-      y += self.variable('bias', [input_layer.shape[3] * channel_multiplier],
-                         bias_init,
-                         dt=dtype)
+    if bias is not None:
+      y += parameter_modifier(
+          'bias',
+          self.variable('bias', [input_layer.shape[3] * channel_multiplier],
+                        bias,
+                        dt=dtype),
+          phase)
     books.add_scalar_summary(
         tf.reduce_mean(layers.spatial_slice_zeros(y)),
         '%s/zeros_spatial' % y.op.name)
@@ -280,9 +345,8 @@ class depthwise_conv2d(prettytensor.VarStoreMethod):
     return input_layer.with_tensor(y, parameters=self.vars)
 # pylint: enable=redefined-outer-name,invalid-name
 
+
 # Helper methods
-
-
 def _kernel(kernel_spec):
   """Expands the kernel spec into a length 2 list.
 
@@ -321,3 +385,95 @@ def _stride(stride_spec):
   else:
     assert len(stride_spec) == 4
     return stride_spec
+
+
+def _interpolate(im, x, y, name):
+  """Perform bilinear sampling on im given x,y coordiantes.
+
+  Implements the differentiable sampling mechanism with bilinear kerenl
+  in https://arxiv.org/abs/1506.02025.
+
+  Modified from https://github.com/tensorflow/models/tree/master/transformer
+
+  x,y are tensors specifying normalized coordinates [-1,1] to sampled on im.
+  (e.g.) (-1,-1) in x,y corresponds to pixel location (0,0) in im, and
+  (1,1) in x,y corresponds to the bottom right pixel in im.
+
+  Args:
+    im: A tensor of size [batch_size, height, width, channels]
+    x: A tensor of size [batch_size, height, width, 1] representing the sampling
+      x coordinates normalized to range [-1,1].
+    y: A tensor of size [batch_size, height, width, 1] representing  the
+      sampling y coordinates normalized to range [-1,1].
+    name: The name for this operation is also used to create/find the
+        parameter variables.
+  Returns:
+    A tensor of size [batch_size, height, width, channels]
+  """
+  with tf.variable_scope(name):
+    x = tf.reshape(x, [-1])
+    y = tf.reshape(y, [-1])
+
+    # constants
+    num_batch = tf.shape(im)[0]
+    _, height, width, channels = im.get_shape().as_list()
+
+    x = tf.to_float(x)
+    y = tf.to_float(y)
+    height_f = tf.cast(height, 'float32')
+    width_f = tf.cast(width, 'float32')
+    zero = tf.constant(0, dtype=tf.int32)
+    max_y = tf.cast(tf.shape(im)[1] - 1, 'int32')
+    max_x = tf.cast(tf.shape(im)[2] - 1, 'int32')
+
+    # scale indices from [-1, 1] to [0, width-1/height-1]
+    x = (x + 1.0) * (width_f - 1.0) / 2.0
+    y = (y + 1.0) * (height_f - 1.0) / 2.0
+
+    # do sampling
+    x0 = tf.cast(tf.floor(x), 'int32')
+    x1 = x0 + 1
+    y0 = tf.cast(tf.floor(y), 'int32')
+    y1 = y0 + 1
+
+    x0 = tf.clip_by_value(x0, zero, max_x)
+    x1 = tf.clip_by_value(x1, zero, max_x)
+    y0 = tf.clip_by_value(y0, zero, max_y)
+    y1 = tf.clip_by_value(y1, zero, max_y)
+    dim2 = width
+    dim1 = width * height
+
+    # Create base index
+    base = tf.range(num_batch) * dim1
+    base = tf.reshape(base, [-1, 1])
+    base = tf.tile(base, [1, height * width])
+    base = tf.reshape(base, [-1])
+
+    base_y0 = base + y0 * dim2
+    base_y1 = base + y1 * dim2
+    idx_a = base_y0 + x0
+    idx_b = base_y1 + x0
+    idx_c = base_y0 + x1
+    idx_d = base_y1 + x1
+
+    # use indices to lookup pixels in the flat image and restore channels dim
+    im_flat = tf.reshape(im, tf.stack([-1, channels]))
+    im_flat = tf.to_float(im_flat)
+    pixel_a = tf.gather(im_flat, idx_a)
+    pixel_b = tf.gather(im_flat, idx_b)
+    pixel_c = tf.gather(im_flat, idx_c)
+    pixel_d = tf.gather(im_flat, idx_d)
+
+    # and finally calculate interpolated values
+    x1_f = tf.to_float(x1)
+    y1_f = tf.to_float(y1)
+
+    wa = tf.expand_dims(((x1_f - x) * (y1_f - y)), 1)
+    wb = tf.expand_dims((x1_f - x) * (1.0 - (y1_f - y)), 1)
+    wc = tf.expand_dims(((1.0 - (x1_f - x)) * (y1_f - y)), 1)
+    wd = tf.expand_dims(((1.0 - (x1_f - x)) * (1.0 - (y1_f - y))), 1)
+
+    output = tf.add_n([wa * pixel_a, wb * pixel_b, wc * pixel_c, wd * pixel_d])
+    output = tf.reshape(
+        output, shape=tf.stack([num_batch, height, width, channels]))
+    return output

@@ -4,18 +4,11 @@
 
 Small class to gather needed pieces from a Graph being built.
 
-The following properties are exposed:
-
-* batch_size: The size of the batches.
-* bits: A dict where named layers and losses can be placed for reference
-    later.
-* global_step: A global step counter. Every time training is executed is
-    considered a step.
-* g: The graph.
-* train_op: The training operation, if setup_training was called.
-* loss: A list of losses.
-* summary_collections: Sets the default tag for all summaries created after
-  this point. Use `None` to disable summaries.
+This class is mostly an implementation detail of Pretty Tensor and almost
+never needs to be used when building a model. Most of the useful methods
+are exposed in the `pt` namespace. The most common usecase for directly
+calling a Bookkeeper methods are to create summaries in the same way as
+Pretty Tensor that are controlled by the `pt.defaults_scope`.
 
 - - -
 
@@ -37,8 +30,7 @@ update operation to the bookkeeper. The name of the variable is
 
 * var: The variable for which a moving average should be computed.
 * tag: The tag of the summary. If None var.name[:-2] is used to strip off
- the ':0' that is added by TF (bookkeeper keeps all var names unique, so
- it is only ever the first one.)
+ the ':0' that is added by TF.
 * decay: How much history to use in the moving average.
  Higher, means more history values [0.9, 1) accepted.
 * ignore_nan: If the value is NaN or Inf, skip it. Note that this default

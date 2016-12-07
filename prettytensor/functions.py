@@ -45,7 +45,7 @@ def l1_regression_loss(y, target, name=None):
   Returns:
     A tensorflow op.
   """
-  with tf.op_scope([y, target], name, 'l1_regression') as scope:
+  with tf.name_scope(name, 'l1_regression', [y, target]) as scope:
     y = tf.convert_to_tensor(y, name='y')
     target = tf.convert_to_tensor(target, name='target')
     return reduce_batch_sum(tf.abs(y - target), name=scope)
@@ -61,14 +61,14 @@ def l2_regression_sq_loss(y, target, name=None):
   Returns:
     A tensorflow op.
   """
-  with tf.op_scope([y, target], name, 'l2_regression_sq') as scope:
+  with tf.name_scope(name, 'l2_regression_sq', [y, target]) as scope:
     y = tf.convert_to_tensor(y, name='y')
     target = tf.convert_to_tensor(target, name='target')
     return reduce_batch_sum(tf.square(y - target), name=scope)
 
 
 def reduce_batch_sum(x, name=None):
-  with tf.op_scope([x], name, 'reduce_batch_sum') as scope:
+  with tf.name_scope(name, 'reduce_batch_sum', [x]) as scope:
     ndims = x.get_shape().ndims
     if ndims == 0:
       raise ValueError('Cannot reduce a scalar into batches.')
@@ -97,7 +97,7 @@ def l2_regression_loss(y, target, name=None):
   Returns:
     A tensorflow op.
   """
-  with tf.op_scope([y, target], name, 'l2_regression') as scope:
+  with tf.name_scope(name, 'l2_regression', [y, target]) as scope:
     y = tf.convert_to_tensor(y, name='y')
     target = tf.convert_to_tensor(target, name='target')
     return tf.sqrt(l2_regression_sq_loss(y, target, name=scope))
@@ -117,14 +117,13 @@ def binary_cross_entropy_loss_with_logits(x, target, name=None):
   Raises:
     ValueError: If shapes are incompatible.
   """
-  with tf.op_scope([x, target], name,
-                   'binary_cross_entropy_with_logits') as scope:
+  with tf.name_scope(name, 'binary_cross_entropy_with_logits',
+                     [x, target]) as scope:
     x.get_shape().assert_is_compatible_with(target.get_shape())
     neg_softplus = -tf.nn.softplus(-x)
-    return -tf.add(
-        tf.mul(target, neg_softplus),
-        tf.mul(1 - target, -x + neg_softplus),
-        name=scope)
+    return -tf.add(tf.multiply(target, neg_softplus),
+                   tf.multiply(1 - target, -x + neg_softplus),
+                   name=scope)
 
 
 def cos_distance(t1, t2, epsilon=1e-12, name=None):
@@ -139,14 +138,12 @@ def cos_distance(t1, t2, epsilon=1e-12, name=None):
   Returns:
     The cos distance between t1 and t2.
   """
-  with tf.op_scope([t1, t2], name, 'cos_distance') as scope:
+  with tf.name_scope(name, 'cos_distance', [t1, t2]) as scope:
     t1 = tf.convert_to_tensor(t1, name='t1')
     t2 = tf.convert_to_tensor(t2, name='t2')
     x_inv_norm = tf.rsqrt(tf.maximum(length_squared(t1) * length_squared(t2),
                                      epsilon))
-    return tf.sub(1.0,
-                  dot_product(t1, t2) * x_inv_norm,
-                  name=scope)
+    return tf.subtract(1.0, dot_product(t1, t2) * x_inv_norm, name=scope)
 
 
 def dot_distance(t1, t2, name=None):
@@ -159,7 +156,7 @@ def dot_distance(t1, t2, name=None):
   Returns:
     The dot distance between t1 and t2.
   """
-  with tf.op_scope([t1, t2], name, 'dot_distance') as scope:
+  with tf.name_scope(name, 'dot_distance', [t1, t2]) as scope:
     return -dot_product(t1, t2, name=scope)
 
 
@@ -173,10 +170,10 @@ def l2_distance_sq(t1, t2, name=None):
   Returns:
     The l2 distance between t1 and t2.
   """
-  with tf.op_scope([t1, t2], name, 'l2_distance_sq') as scope:
+  with tf.name_scope(name, 'l2_distance_sq', [t1, t2]) as scope:
     t1 = tf.convert_to_tensor(t1, name='t1')
     t2 = tf.convert_to_tensor(t2, name='t2')
-    return length_squared(tf.sub(t1, t2), name=scope)
+    return length_squared(tf.subtract(t1, t2), name=scope)
 
 
 def l2_distance(t1, t2, epsilon=1e-12, name=None):
@@ -191,7 +188,7 @@ def l2_distance(t1, t2, epsilon=1e-12, name=None):
   Returns:
     The l2 distance between t1 and t2.
   """
-  with tf.op_scope([t1, t2], name, 'l2_distance') as scope:
+  with tf.name_scope(name, 'l2_distance', [t1, t2]) as scope:
     t1 = tf.convert_to_tensor(t1, name='t1')
     t2 = tf.convert_to_tensor(t2, name='t2')
     return tf.sqrt(tf.maximum(l2_distance_sq(t1, t2, scope), epsilon))
@@ -207,10 +204,10 @@ def l1_distance(t1, t2, name=None):
   Returns:
     The l1 distance between t1 and t2.
   """
-  with tf.op_scope([t1, t2], name, 'l1_distance') as scope:
+  with tf.name_scope(name, 'l1_distance', [t1, t2]) as scope:
     t1 = tf.convert_to_tensor(t1, name='t1')
     t2 = tf.convert_to_tensor(t2, name='t2')
-    sub = tf.sub(t1, t2)
+    sub = tf.subtract(t1, t2)
     reduction_dim = _last_index(sub, 1)
     return tf.reduce_sum(tf.abs(sub), reduction_dim, name=scope)
 
@@ -228,9 +225,9 @@ def leaky_relu(x, name=None):
   Returns:
     x if x > 0 otherwise 0.01 * x.
   """
-  with tf.op_scope([x], name, 'leaky_relu') as scope:
+  with tf.name_scope(name, 'leaky_relu', [x]) as scope:
     x = tf.convert_to_tensor(x, name='x')
-    return tf.select(tf.less(x, 0.0), 0.01 * x, x, name=scope)
+    return tf.where(tf.less(x, 0.0), 0.01 * x, x, name=scope)
 
 
 def softplus(x, scale=1.0, name=None):
@@ -244,18 +241,15 @@ def softplus(x, scale=1.0, name=None):
     scale: A float that sharpens the curve.
     name: Optional name.
   Returns:
-    y = log(1 + exp(x))
+    y = log(1 + exp(scale * x)) / scale
 
   """
-  with tf.op_scope([x], name, 'softplus') as scope:
-    x = tf.convert_to_tensor(x, name='x')
-    # y ~= x when x > _SOFTPLUS_STABILITY_LIMIT.  This improves numerical
-    # stability.
-    return tf.select(
-        tf.greater(x, _SOFTPLUS_STABILITY_LIMIT / scale),
-        x,
-        tf.log(tf.exp(x * scale) + 1.0) / scale,
-        name=scope)
+  if scale == 1:
+    return tf.nn.softplus(x)
+  else:
+    with tf.name_scope(name, 'softplus', [x]):
+      scale = tf.convert_to_tensor(scale, dtype=x.dtype.base_dtype)
+      return tf.nn.softplus(x * scale) / scale
 
 
 # Copied to keep API consistency with other functions.
@@ -274,7 +268,7 @@ def l1_normalize(x, dim, epsilon=1e-12, name=None):
   Returns:
     x normalized along dim.
   """
-  with tf.op_scope([x], name, 'l1_normalize') as scope:
+  with tf.name_scope(name, 'l1_normalize', [x]) as scope:
     x = tf.convert_to_tensor(x, name='x')
     x = tf.verify_tensor_all_finite(x, 'Error at input %s' % scope)
     x_norm = tf.maximum(tf.reduce_sum(tf.abs(x), [dim], keep_dims=True),
@@ -294,7 +288,7 @@ def every_other(x, name=None):
   Returns:
     A tensorflow op.
   """
-  with tf.op_scope([x], name, 'every_other') as scope:
+  with tf.name_scope(name, 'every_other', [x]) as scope:
     x = tf.convert_to_tensor(x, name='x')
     return tf.reshape(
         tf.slice(
@@ -316,10 +310,10 @@ def dot_product(t1, t2, keep_dims=False, name=None, reduction_dim=None):
   Returns:
     The dot product.
   """
-  with tf.op_scope([t1, t2], name, 'dot') as scope:
+  with tf.name_scope(name, 'dot', [t1, t2]) as scope:
     t1 = tf.convert_to_tensor(t1, name='t1')
     t2 = tf.convert_to_tensor(t2, name='t2')
-    mul = tf.mul(t1, t2)
+    mul = tf.multiply(t1, t2)
     if not reduction_dim:
       reduction_dim = _last_index(mul, 1)
     return tf.reduce_sum(mul, reduction_dim, name=scope, keep_dims=keep_dims)
@@ -337,7 +331,7 @@ def length_squared(x, keep_dims=False, name=None, reduction_dim=None):
   Returns:
     The squared length of x.
   """
-  with tf.op_scope([x], name, 'length_squared') as scope:
+  with tf.name_scope(name, 'length_squared', [x]) as scope:
     x = tf.convert_to_tensor(x, name='x')
     if not reduction_dim:
       reduction_dim = _last_index(x, 1)
@@ -365,7 +359,7 @@ def unzip(x, split_dim, current_length, num_splits=2, name=None):
   Returns:
     A length num_splits sequence.
   """
-  with tf.op_scope([x], name, 'unzip') as scope:
+  with tf.name_scope(name, 'unzip', [x]) as scope:
     x = tf.convert_to_tensor(x, name='x')
     # There is probably a more efficient way to do this.
     all_splits = tf.split(split_dim, current_length, x, name=scope)

@@ -29,7 +29,7 @@ from prettytensor import pretty_tensor_testing
 from prettytensor import recurrent_networks
 
 
-TOLERANCE = 0.000001
+TOLERANCE = 0.00001
 
 
 class SequenceInputMock(object):
@@ -122,21 +122,37 @@ class RecurrentNetworksTest(pretty_tensor_testing.PtTestCase):
     for i in xrange(4):
       self.assertSequenceEqual(lstm.shape, result[i].shape)
 
-  def testArbitraryBatchSizeLstm(self):
-    # Tests whether the LSTM / Bookkeeper function when batch_size is not
+  def testSequenceGru(self):
+    gru = self.input.sequence_gru(13)
+    result = self.RunTensor(gru)
+
+    self.assertEquals([4, 13], gru.shape)
+    self.assertEquals(4, len(result))
+    for i in xrange(4):
+      self.assertSequenceEqual(gru.shape, result[i].shape)
+
+  def performTestArbitraryBatchSizeRnn(self, cell_type):
+    # Tests whether LSTM / GRU / Bookkeeper function when batch_size is not
     # specified at graph creation time (i.e., None).
+    self.assertTrue(cell_type == 'lstm' or cell_type == 'gru')
     super(self.__class__, self).SetBookkeeper(
         prettytensor.bookkeeper_for_new_graph())
 
     # Build a graph. Specify None for the batch_size dimension.
     placeholder = tf.placeholder(tf.float32, [None, 1])
     input_pt = prettytensor.wrap_sequence([placeholder])
-    output, _ = (input_pt
-                 .sequence_lstm(4)
-                 .squash_sequence()
-                 .softmax_classifier(2))
+    if cell_type == 'lstm':
+      output, _ = (input_pt
+                   .sequence_lstm(4)
+                   .squash_sequence()
+                   .softmax_classifier(2))
+    elif cell_type == 'gru':
+      output, _ = (input_pt
+                   .sequence_gru(4)
+                   .squash_sequence()
+                   .softmax_classifier(2))
 
-    self.sess.run(tf.initialize_all_variables())
+    self.sess.run(tf.global_variables_initializer())
 
     # Use RecurrentRunner for state saving and managing feeds.
     recurrent_runner = recurrent_networks.RecurrentRunner(batch_size=1)
@@ -172,10 +188,16 @@ class RecurrentNetworksTest(pretty_tensor_testing.PtTestCase):
     with tf.Graph().as_default():
       placeholder2 = tf.placeholder(tf.float32, [None, 1])
       input_pt2 = prettytensor.wrap_sequence([placeholder2])
-      output2, _ = (input_pt2
-                    .sequence_lstm(4)
-                    .squash_sequence()
-                    .softmax_classifier(2))
+      if cell_type == 'lstm':
+        output2, _ = (input_pt2
+                      .sequence_lstm(4)
+                      .squash_sequence()
+                      .softmax_classifier(2))
+      elif cell_type == 'gru':
+        output2, _ = (input_pt2
+                      .sequence_gru(4)
+                      .squash_sequence()
+                      .softmax_classifier(2))
       self.assertRaises(ValueError,
                         recurrent_runner.run,
                         [output2.name], None, self.sess)
@@ -194,7 +216,19 @@ class RecurrentNetworksTest(pretty_tensor_testing.PtTestCase):
       self.assertEqual(2, len(out[0]))
       testing.assert_allclose(out[0], out[2], rtol=TOLERANCE)
       testing.assert_allclose(out[0], out_orig[t], rtol=TOLERANCE)
+      # Sanity check to protect against trivial outputs that might hide errors.
+      # Need to avoid checking after t = 2 since untrained GRUs have a
+      # tendency to converge to large state values, leading to outputs like
+      # 1.0, 0.0.
+      if cell_type == 'gru' and t > 2:
+        continue
       self.assertFalse((out[0] == out[1]).all())
+
+  def testArbitraryBatchSizeLstm(self):
+    self.performTestArbitraryBatchSizeRnn('lstm')
+
+  def testArbitraryBatchSizeGru(self):
+    self.performTestArbitraryBatchSizeRnn('gru')
 
   def testSequence(self):
     result = self.RunTensor(self.input[-1])
@@ -252,7 +286,7 @@ class RecurrentNetworksTest(pretty_tensor_testing.PtTestCase):
       lstm_truncated = self.input.sequence_lstm(13, lengths=lengths)
 
     with tf.Session() as sess:
-      tf.initialize_all_variables().run()
+      tf.global_variables_initializer().run()
 
       result = sess.run(base_lstm.sequence + lstm_truncated.sequence,
                         {lengths: [10, 4, 1, 1]})

@@ -42,7 +42,7 @@ class PtTestCase(unittest.TestCase):
   def RunTensor(self, layer, init=True):
     """Convenience method to run a tensor."""
     if init:
-      self.sess.run(tf.initialize_all_variables())
+      self.sess.run(tf.global_variables_initializer())
     if isinstance(layer, (tf.Tensor, six.string_types)):
       return self.sess.run(layer)
     elif layer.is_sequence():

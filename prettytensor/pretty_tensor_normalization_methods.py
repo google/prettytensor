@@ -59,7 +59,7 @@ def batch_normalize_with_arguments(x, arguments):
       if arg in defaults:
         kwargs[arg] = defaults[arg]
       else:
-        del kwargs
+        del kwargs[arg]
   return x.batch_normalize(**kwargs)
 
 

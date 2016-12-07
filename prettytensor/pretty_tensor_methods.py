@@ -20,6 +20,7 @@ import tensorflow as tf
 
 from prettytensor import functions
 from prettytensor import layers
+from prettytensor import parameters
 from prettytensor import pretty_tensor_class as prettytensor
 from prettytensor.pretty_tensor_class import DIM_REST
 from prettytensor.pretty_tensor_class import DIM_SAME
@@ -27,18 +28,24 @@ from prettytensor.pretty_tensor_class import Phase
 from prettytensor.pretty_tensor_class import PROVIDED
 
 
+# TODO(eiderman): many of these functions are different depending on if the
+# underlying PT holds a sequence or a tensor. The underlying PT should be
+# separate types so that the dispatch is handled by type instead of if
+# statement.
+
+
 def _infer_unknown_dims(old_shape, shape_spec):
   """Attempts to replace DIM_REST (if present) with a value.
 
-  Because of DIM_SAME, this has more information to compute a shape value than
-  the default reshape's shape function.
+  Because of `pt.DIM_SAME`, this has more information to compute a shape value
+  than the default reshape's shape function.
 
   Args:
     old_shape: The current shape of the Tensor as a list.
     shape_spec: A shape spec, see `pt.reshape`.
   Returns:
-    A list derived from `shape_spec` with `DIM_SAME` replaced by the value from
-    old_shape (if possible) and `DIM_REST` computed (if possible).
+    A list derived from `shape_spec` with `pt.DIM_SAME` replaced by the value
+    from old_shape (if possible) and `pt.DIM_REST` computed (if possible).
   Raises:
     ValueError: If there are two many unknown dimensions or the shape_spec
     requires out of range DIM_SAME.
@@ -108,12 +115,18 @@ def _infer_unknown_dims(old_shape, shape_spec):
 def reshape(input_layer, shape_spec):
   """Reshapes this tensor to the given spec.
 
+  This provides additional functionality over the basic `tf.reshape`. In
+  particular, it provides the ability to specify some dimensions as unchanged
+  (`pt.DIM_SAME`) which can greatly aid in inferring the extra dimensions
+  (`pt.DIM_REST`) and help maintain more shape information going forward.
+
   A shape_spec can be a list or tuple of numbers specifying the new shape, but
   also may include the following shorthands for using values from the shape of
   the input:
 
-  1. DIM_SAME ('_') will use the corresponding value from the current shape.
-  2. One -1 or DIM_REST ('*') can be used to specify the remainder of the
+  1. `pt.DIM_SAME` ('_') will use the corresponding value from the current
+      shape.
+  2. One -1 or `pt.DIM_REST` ('*') can be used to specify the remainder of the
       values.
   3. An integer will be used as is.
 
@@ -235,42 +248,41 @@ def dropout(input_layer, keep_prob, phase=Phase.train, name=PROVIDED):
 
 # TODO(eiderman): Give a good name for this function: Maybe InnerProductIsh ?
 # pylint: disable=invalid-name
-@prettytensor.Register(assign_defaults=('l2loss', 'stddev'))
+@prettytensor.Register(
+    assign_defaults=('l2loss', 'parameter_modifier', 'phase'))
 class diagonal_matrix_mul(prettytensor.VarStoreMethod):
   """Diagonal Matrix Multiplication."""
 
-  def __call__(self, input_layer, init=None, stddev=None, l2loss=None):
+  def __call__(self,
+               input_layer,
+               weights=None,
+               l2loss=None,
+               phase=prettytensor.Phase.train,
+               parameter_modifier=parameters.identity):
     """Performs a diagonal matrix multiplication with a learned vector.
 
     This creates the parameter vector.
 
     Args:
       input_layer: The input_layer.
-      init: An optional initialization or Tensor. If not specified, uses Xavier
-        initialization.
-      stddev: A standard deviation to use in parameter initialization.
+      weights:  An initializer for weights or a Tensor. If not specified,
+        uses Xavier initialization.
       l2loss: An l2 weight decay to apply.
+      phase: The phase of graph construction.  See `pt.Phase`.
+      parameter_modifier: A function to modify parameters that is applied after
+        creation and before use.
     Returns:
       A Pretty Tensor handle to the layer.
     Raises:
-      ValueError: if the head_shape is not rank 2  or the number of input nodes
+      ValueError: if this is not rank 2 or the number of input nodes
       (second dim) is not known.
     """
     size = input_layer.shape[-1]
-    if init is None:
-      if stddev is None:
-        init = layers.xavier_init(size, 0)
-      else:
-        tf.logging.warning(
-            'Passing `stddev` to initialize weight variable is deprecated and '
-            'will be removed in the future. Pass '
-            'tf.truncated_normal_initializer(stddev=stddev) or '
-            'tf.zeros_initializer to `init` instead.')
-        if stddev:
-          init = tf.truncated_normal_initializer(stddev=stddev)
-        else:
-          init = tf.zeros_initializer
-    param = self.variable('weights', [size], init)
+    if weights is None:
+      weights = layers.xavier_init(size, 0)
+
+    param = parameter_modifier('weights', self.variable('weights', [size],
+                                                        weights), phase)
     layers.add_l2loss(input_layer.bookkeeper, param, l2loss)
 
     return input_layer.with_tensor(input_layer * param, parameters=self.vars)
@@ -278,7 +290,8 @@ class diagonal_matrix_mul(prettytensor.VarStoreMethod):
 
 
 # pylint: disable=invalid-name
-@prettytensor.Register(assign_defaults=('activation_fn', 'l2loss', 'stddev'))
+@prettytensor.Register(assign_defaults=('activation_fn', 'l2loss',
+                                        'parameter_modifier', 'phase'))
 class fully_connected(prettytensor.VarStoreMethod):
 
   def __call__(self,
@@ -286,15 +299,15 @@ class fully_connected(prettytensor.VarStoreMethod):
                size,
                activation_fn=None,
                l2loss=None,
-               init=None,
-               stddev=None,
-               bias=True,
-               bias_init=tf.zeros_initializer,
+               weights=None,
+               bias=tf.zeros_initializer,
                transpose_weights=False,
+               phase=prettytensor.Phase.train,
+               parameter_modifier=parameters.identity,
                name=PROVIDED):
     """Adds the parameters for a fully connected layer and returns a tensor.
 
-    The current head must be a rank 2 Tensor.
+    The current PrettyTensor must have rank 2.
 
     Args:
       input_layer: The Pretty Tensor object, supplied.
@@ -304,74 +317,56 @@ class fully_connected(prettytensor.VarStoreMethod):
         common functions will have summaries added (e.g. relu).
       l2loss: Set to a value greater than 0 to use L2 regularization to decay
         the weights.
-      init: An optional initialization. If not specified, uses Xavier
-        initialization.
-      stddev: A standard deviation to use in parameter initialization.
-      bias: Set to False to not have a bias.
-      bias_init: The initializer for the bias or a Tensor.
+      weights:  An initializer for weights or a Tensor. If not specified,
+        uses He's initialization.
+      bias: An initializer for the bias or a Tensor. No bias if set to None.
       transpose_weights: Flag indicating if weights should be transposed;
         this is useful for loading models with a different shape.
+      phase: The phase of graph construction.  See `pt.Phase`.
+      parameter_modifier: A function to modify parameters that is applied after
+        creation and before use.
       name: The name for this operation is also used to create/find the
         parameter variables.
     Returns:
       A Pretty Tensor handle to the layer.
     Raises:
-      ValueError: if the head_shape is not rank 2  or the number of input nodes
-      (second dim) is not known.
+      ValueError: if the Pretty Tensor is not rank 2  or the number of input
+        nodes (second dim) is not known.
     """
-    # TODO(eiderman): bias_init shouldn't take a constant and stddev shouldn't
-    # exist.
     if input_layer.get_shape().ndims != 2:
       raise ValueError(
           'fully_connected requires a rank 2 Tensor with known second '
-          'dimension: %s'
-          % input_layer.get_shape())
+          'dimension: %s' % input_layer.get_shape())
     in_size = input_layer.shape[1]
     if input_layer.shape[1] is None:
       raise ValueError('Number of input nodes must be known.')
     books = input_layer.bookkeeper
-    if init is None:
-      if stddev is None:
-        init = layers.he_init(in_size, size, activation_fn)
-      else:
-        tf.logging.warning(
-            'Passing `stddev` to initialize weight variable is deprecated and '
-            'will be removed in the future. Pass '
-            'tf.truncated_normal_initializer(stddev=stddev) or '
-            'tf.zeros_initializer to `init` instead.')
-        if stddev:
-          init = tf.truncated_normal_initializer(stddev=stddev)
-        else:
-          init = tf.zeros_initializer
-    elif stddev is not None:
-      raise ValueError('Do not set both init and stddev.')
+    if weights is None:
+      weights = layers.he_init(in_size, size, activation_fn)
+
     dtype = input_layer.tensor.dtype
     weight_shape = [size, in_size] if transpose_weights else [in_size, size]
 
-    params = self.variable(
+    params = parameter_modifier(
         'weights',
-        weight_shape,
-        init,
-        dt=dtype)
+        self.variable('weights', weight_shape,
+                      weights, dt=dtype),
+        phase)
     y = tf.matmul(input_layer, params, transpose_b=transpose_weights)
     layers.add_l2loss(books, params, l2loss)
-    if bias:
-      if isinstance(bias_init, tf.compat.real_types):
-        bias_init = tf.constant_initializer(bias_init)
-      y += self.variable(
+    if bias is not None:
+      y += parameter_modifier(
           'bias',
-          [size],
-          bias_init,
-          dt=dtype)
+          self.variable('bias', [size], bias, dt=dtype),
+          phase)
 
     if activation_fn is not None:
       if not isinstance(activation_fn, collections.Sequence):
         activation_fn = (activation_fn,)
-      y = layers.apply_activation(
-          books,
-          y,
-          activation_fn[0],
-          activation_args=activation_fn[1:])
+      y = layers.apply_activation(books,
+                                  y,
+                                  activation_fn[0],
+                                  activation_args=activation_fn[1:])
     books.add_histogram_summary(y, '%s/activations' % y.op.name)
     return input_layer.with_tensor(y, parameters=self.vars)
 # pylint: enable=invalid-name
@@ -379,7 +374,7 @@ class fully_connected(prettytensor.VarStoreMethod):
 
 @prettytensor.Register
 def apply_with_summary(input_layer, operation, *op_args, **op_kwargs):
-  """Applies the given operation to this and sets the new head.
+  """Applies the given operation to `input_layer` and create a summary.
 
   Args:
     input_layer: The input layer for this op.
@@ -389,12 +384,11 @@ def apply_with_summary(input_layer, operation, *op_args, **op_kwargs):
   Returns:
     A new layer with operation applied.
   """
-  return layers.apply_activation(
-      input_layer.bookkeeper,
-      input_layer.tensor,
-      operation,
-      activation_args=op_args,
-      activation_kwargs=op_kwargs)
+  return layers.apply_activation(input_layer.bookkeeper,
+                                 input_layer.tensor,
+                                 operation,
+                                 activation_args=op_args,
+                                 activation_kwargs=op_kwargs)
 
 
 @prettytensor.Register()
@@ -457,8 +451,8 @@ def join(input_layer, others, include_self=True, join_function=None):
     list_of_tensors.extend(others)
   else:
     list_of_tensors = others
-  return prettytensor.join_pretty_tensors(
-      list_of_tensors, input_layer, join_function)
+  return prettytensor.join_pretty_tensors(list_of_tensors, input_layer,
+                                          join_function)
 
 
 def _check_split_dims(num_splits, split_dim, shape):
@@ -473,7 +467,7 @@ def _check_split_dims(num_splits, split_dim, shape):
 
 @prettytensor.Register
 def unzip(input_layer, split_dim=0, num_splits=2):
-  """Unzips the head Tensor along the split_dim into num_splits Equal chunks.
+  """Unzips this Tensor along the split_dim into num_splits Equal chunks.
 
   Examples:
 
@@ -497,7 +491,7 @@ def unzip(input_layer, split_dim=0, num_splits=2):
 
 
 @prettytensor.Register
-def concat(input_layer, concat_dim, other_tensors):
+def concat(input_layer, concat_dim, other_tensors=None):
   """Concatenates input PrettyTensor with other_tensors along the specified dim.
 
   This adds the Pretty Tensor passed via input_layer to the front of the list of
@@ -506,13 +500,26 @@ def concat(input_layer, concat_dim, other_tensors):
   Args:
     input_layer: The input layer.
     concat_dim: The dimension along which to concat.
-    other_tensors: The tensors to concatenate with.
+    other_tensors: The tensors to concatenate with as an iterable or None if
+      this is called on a sequence.
   Returns:
     A new PrettyTensor.
+  Raises:
+    ValueError: If other_tensors is None and this is not a sequence.
   """
-  result = [input_layer]
-  result.extend(other_tensors)
-  return tf.concat(concat_dim, result)
+  if input_layer.is_sequence():
+    all_tensors = input_layer.sequence
+    all_tensors.extend(other_tensors or [])
+  else:
+    all_tensors = [input_layer]
+    if other_tensors is None:
+      raise ValueError('Other Tensors must be supplied.')
+    all_tensors.extend(other_tensors)
+  # Edge cases really only apply when this is a sequence with 0 or 1 element.
+  if not all_tensors:
+    return prettytensor.wrap_sequence([])
+  else:
+    return tf.concat(concat_dim, all_tensors)
 
 
 @prettytensor.Register(method_name='slice')
@@ -560,7 +567,7 @@ def slice_(input_layer, begin, size):
 
 @prettytensor.Register
 def split(input_layer, split_dim=0, num_splits=2):
-  """Splits the head Tensor along the split_dim into num_splits Equal chunks.
+  """Splits this Tensor along the split_dim into num_splits Equal chunks.
 
   Examples:
 
@@ -678,3 +685,57 @@ def _map_or_apply(input_layer, op, *args, **kwargs):
       my_op = lambda x: op(x, *args, **kwargs)
     return my_op(input_layer.tensor)
 
+
+def _strip_see(m):
+  start = m.__doc__.find('See [')
+  if start >= 0:
+    end = m.__doc__.find('Args:', start)
+    if end > 0:
+      m.__doc__ = m.__doc__[:start] + m.__doc__[end:]
+      return
+  tf.logging.info('Unable to fix doc: %s' % m.__doc__)
+
+
+# Adds some common activation functions.
+
+prettytensor.Register(tf.nn.relu)
+prettytensor.Register(tf.nn.relu6)
+prettytensor.Register(tf.sigmoid)
+prettytensor.Register(tf.nn.softplus)
+prettytensor.Register(tf.nn.softsign)
+prettytensor.Register(tf.nn.tanh)
+
+prettytensor.Register(functions.leaky_relu)
+prettytensor.Register(functions.l1_normalize)
+prettytensor.Register(tf.nn.l2_normalize)
+
+# These should be expected because they match numpy.
+_strip_see(prettytensor.Register(tf.abs))
+prettytensor.Register(tf.complex_abs)
+prettytensor.Register(tf.log)
+prettytensor.Register(tf.sqrt)
+prettytensor.Register(tf.square)
+
+prettytensor.Register(tf.pack)
+prettytensor.Register(tf.unpack)
+
+
+# Not strictly matching numpy, but reductions are along the same vein.
+prettytensor.Register(tf.reduce_all)
+prettytensor.Register(tf.reduce_any)
+prettytensor.Register(tf.reduce_join)
+prettytensor.Register(tf.reduce_max)
+prettytensor.Register(tf.reduce_min)
+prettytensor.Register(tf.reduce_mean)
+prettytensor.Register(tf.reduce_prod)
+prettytensor.Register(tf.reduce_sum)
+
+# Casting
+prettytensor.Register(tf.to_double)
+prettytensor.Register(tf.to_float)
+prettytensor.Register(tf.to_int32)
+prettytensor.Register(tf.to_int64)
+
+
+# This one is just plain useful now that indexing works in TF.
+prettytensor.Register(method_name='tensor_shape')(tf.shape)

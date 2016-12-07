@@ -27,7 +27,6 @@ import itertools
 import operator
 import traceback
 
-import enum
 import six
 from six.moves import xrange  # pylint: disable=redefined-builtin
 from six.moves import zip  # pylint: disable=redefined-builtin
@@ -60,14 +59,14 @@ _defaults = {}
 _unspecified = ('unspecified',)
 
 
-class Phase(enum.Enum):
+class Phase(object):
   """Some nodes are different depending on the phase of the graph construction.
 
   The standard phases are train, test and infer.
   """
-  train = 1
-  test = 2
-  infer = 3
+  train = 'train'
+  test = 'eval'
+  infer = 'infer'
 
 
 def _set_shape_on_tensor(tensor, shape):
@@ -102,7 +101,8 @@ def wrap(tensor, books=None, tensor_shape=None):
 
   Args:
     tensor: The tensor.
-    books: The bookkeeper.
+    books: The bookkeeper; this is usually not required unless you are building
+      multiple `tf.Graphs.`
     tensor_shape: An optional shape that will be set on the Tensor or verified
       to match the tensor.
   Returns:
@@ -131,6 +131,52 @@ def wrap(tensor, books=None, tensor_shape=None):
 
 def template(key, books=None, optional=False):
   """Starts a Pretty Tensor graph template.
+
+  ## Template Mode
+
+  Templates allow you to define a graph with some unknown
+  values. The most common use case is to leave the input undefined and then
+  define a graph normally. The variables are only defined once the first time
+  the graph is constructed.  For example:
+
+      template = (pretty_tensor.template('input')
+                  .fully_connected(200, name='l1')
+                  .fully_connected(200, name='l2'))
+      train_output = template.construct(input=train_data)
+
+      # All parameters are reused when the same template object is called again.
+      test_output = template.construct(input=test_data)
+
+  Any argument to a pretty tensor method can be substituted by using an
+  `UnboundVariable`.
+  This allows you to parameterize a graph in arbitrary ways. The most cannonical
+  usage would be to substitute a phase variable.
+
+      with pretty_tensor.defaults_scope(phase=UnboundVariable('train')):
+        # dropout uses train to optionaly disable itself.
+
+        template = (pretty_tensor.template('input')
+                    .fully_connected(200, name='l1')
+                    .fully_connected(200, name='l2')
+                    .dropout(.8))
+      train_output = template.construct(input=train_data, train=True)
+      test_output = template.construct(input=test_data, train=False)
+
+
+  You should use caution because if a template is called with incompatible
+  values (e.g. train and test using different widths), then it will break. This
+  is because we guarantee variable reuse across instantiations.
+
+      template = (pretty_tensor.template('input')
+                  .fully_connected(200, name='l1')
+                  .fully_connected(
+                      pretty_tensor.UnboundVariable('width'), name='l2'))
+      train_output = template.construct(input=train_data, width=200)
+
+      # The following line will die because the shared parameter is the wrong
+      # size.
+      test_output = template.construct(input=test_data, width=100)
+
 
   A Layer in the resulting graph can be realized by calling
   `bind(key=value)` and then `construct`.
@@ -173,9 +219,9 @@ def wrap_sequence(sequence, books=None, tensor_shape=None):
   """
   if books is None:
     books = bookkeeper.for_default_graph()
-  for t in sequence:
-    _set_shape_on_tensor(t, tensor_shape)
-  return Layer(books, sequence=sequence, name=sequence[0].name)
+  my_sequence = [
+      wrap(t, books=books, tensor_shape=tensor_shape) for t in sequence]
+  return Layer(books, sequence=my_sequence, name=my_sequence[0].name)
 
 
 def _assert_value_not_string(name, kwargs):
@@ -187,16 +233,20 @@ def _assert_value_not_string(name, kwargs):
 def defaults_scope(**kwargs):
   """Creates a scope for the defaults that are used in a `with` block.
 
+  Note: `defaults_scope` supports nesting where later defaults can be
+  overridden. Also, an explicitly given keyword argument on a method always
+  takes precedence.
+
   In addition to setting defaults for some methods, this also can control:
 
   * `summary_collections`: Choose which collection to place summaries in or
       disable with `None`.
   * `trainable_variables`: Boolean indicating if variables are trainable.
   * `variable_collections`: Default collections in which to place variables;
-      `tf.GraphKeys.VARIABLES` is always included.
+      `tf.GraphKeys.GLOBAL_VARIABLES` is always included.
 
   Args:
-    **kwargs: The defaults.Cloned from CL 117475959 by 'g4 patch'.
+    **kwargs: The defaults.
   Yields:
     Doesn't really yield, instead this creates a Context Manager for use in a
     `with` statement.
@@ -446,71 +496,8 @@ class PrettyTensorTupleMixin(object):
     return func
 
 
-class Loss(object):
-  """Wraps a layer to provide a handle to the tensor and disallows chaining.
-
-  A loss can be used as a regular Tensor.  You can also call `mark_as_required`
-  in order to put the loss into a collection. This is useful for auxilary heads
-  and other multi-loss structures.
-  """
-
-  def __init__(self, loss, name):
-    self._loss = loss
-    if name is None:
-      self._name = loss.op.name
-    else:
-      self._name = name
-    self._marked = False
-
-  @property
-  def tensor(self):
-    """Returns the tensor for this layer."""
-    return self._loss
-
-  @property
-  def name(self):
-    return self._loss.name
-
-  @property
-  def shape(self):
-    return self._loss.get_shape().as_list()
-
-  def get_shape(self):
-    return self._loss.get_shape()
-
-  @property
-  def dtype(self):
-    return self._loss.dtype
-
-  def _as_graph_element(self):
-    """Returns the underlying graph element if possible."""
-    # Self might be holding something else that isn't a true tensor, so
-    # if the 'tensor' can behave like a graph element, look for its
-    # _AsGraphElement method and call it. Graph elements themselves may not
-    # have or need this method, so just return other items directly.
-    obj = self.tensor
-    conv_fn = getattr(obj, '_as_graph_element', None)
-    if conv_fn and isinstance(conv_fn, collections.Callable):
-      obj = conv_fn()
-    return obj
-
-  def mark_as_required(self):
-    """Adds this loss to the MARKED_LOSSES collection."""
-    if not self._marked:
-      self._loss.graph.add_to_collection(bookkeeper.GraphKeys.MARKED_LOSSES,
-                                         self._loss)
-      self._marked = True
-
-  def is_sequence(self):
-    """Losses are never sequences."""
-    return False
-
-  def __str__(self):
-    return self._name
-
-
 class PrettyTensor(object):
-  """A PrettyTensor is a Tensor with a builder interface facade.
+  """A PrettyTensor is a wrapper on a Tensor that simplifies graph building.
 
   A PrettyTensor behaves like a Tensor, but also
   supports a chainable object syntax to quickly define neural networks
@@ -590,50 +577,6 @@ class PrettyTensor(object):
       seq.fully_connected(200, activation_fn=(tf.nn.relu,))
       seq.fully_connected(10, activation_fn=None)
       result = seq.softmax(labels, name=softmax_name)
-
-  ## Template Mode
-
-  Templates allow you to define a (potentially large) graph with some unknown
-  values. The most common use case is to leave the input undefined and then
-  define a graph normally. The variables are only defined once every time the
-  graph is constructed.  For example:
-
-      template = (pretty_tensor.template('input')
-                  .fully_connected(200, name='l1')
-                  .fully_connected(200, name='l2'))
-      train_output = template.construct(input=train_data)
-
-      # All parameters are reused when the same template object is called again.
-      test_output = template.construct(input=test_data)
-
-  Any argument to a pretty tensor method can be substituted by using an
-  `UnboundVariable`.
-  This allows you to parameterize a graph in arbitrary ways. The most cannonical
-  usage would be to substitute a phase variable.
-
-      with pretty_tensor.defaults_scope(phase=UnboundVariable('train')):
-        # dropout uses train to optionaly disable itself.
-
-        template = (pretty_tensor.template('input')
-                    .fully_connected(200, name='l1')
-                    .fully_connected(200, name='l2')
-                    .dropout(.8))
-      train_output = template.construct(input=train_data, train=True)
-      test_output = template.construct(input=test_data, train=False)
-
-
-  You should use caution because if a template is called with incompatible
-  values (e.g. train and test using different widths), then it will break.
-
-      template = (pretty_tensor.template('input')
-                  .fully_connected(200, name='l1')
-                  .fully_connected(
-                      pretty_tensor.UnboundVariable('width'), name='l2'))
-      train_output = template.construct(input=train_data, width=200)
-
-      # The following line will die because the shared parameter is the wrong
-      # size.
-      test_output = template.construct(input=test_data, width=100)
   """
 
   def __init__(self, books):
@@ -761,7 +704,7 @@ class PrettyTensor(object):
   def add_loss(self, loss, name=None):
     """Adds a loss and returns a wrapper for that loss."""
     self.bookkeeper.add_loss(loss, name=name)
-    return Loss(loss, name)
+    return Loss(self.bookkeeper, tensor=loss, name=name)
 
   # pylint: disable=invalid-name
   def _replace_args_with_defaults(self, _args=None, **kwargs):
@@ -965,8 +908,8 @@ class Layer(PrettyTensor):
       ValueError: if this doesn't end up with a bookkeeper, value and name.
     """
     # pylint: disable=protected-access
-    if copy:
-      super(self.__class__, self).__init__(books or copy.bookkeeper)
+    if copy is not None:
+      super(Layer, self).__init__(books or copy.bookkeeper)
       if tensor is not None or sequence is not None:
         self._tensor = tensor
         self._sequence = sequence
@@ -976,7 +919,7 @@ class Layer(PrettyTensor):
       self._scope = copy._scope if scope is _unspecified else scope
       self._defaults = defaults or copy._defaults
     else:
-      super(self.__class__, self).__init__(books)
+      super(Layer, self).__init__(books)
       self._tensor = tensor
       self._sequence = sequence
       self._scope = None if scope is _unspecified else scope
@@ -1063,6 +1006,20 @@ class Layer(PrettyTensor):
   @property
   def defaults(self):
     return self._defaults
+
+
+class Loss(Layer):
+  """Wraps a layer to provide a handle to the tensor and disallows chaining.
+
+  A loss can be used as a regular Tensor.  You can also call `mark_as_required`
+  in order to put the loss into a collection. This is useful for auxilary heads
+  and other multi-loss structures.
+  """
+
+  def mark_as_required(self):
+    """Adds this loss to the MARKED_LOSSES collection."""
+    if self not in tf.get_collection(bookkeeper.GraphKeys.MARKED_LOSSES):
+      tf.add_to_collection(bookkeeper.GraphKeys.MARKED_LOSSES, self)
 
 
 class UnboundVariable(object):
@@ -1402,6 +1359,25 @@ class SequentialLayerBuilder(PrettyTensor):
     super(self.__class__, self).__init__(head.bookkeeper)
     self._head = head
 
+  def construct(self, **bindings):
+    """Constructs the graph and returns either a tensor or a sequence.
+
+    Note: This method requires that this SequentialLayerBuilder holds a
+    template.
+
+    Args:
+      **bindings: Arguments for every deferred parameter.
+    Returns:
+      The value that is placed into this.
+    Raises:
+      ValueError: if this doesn't hold a template.
+    """
+    if hasattr(self._head, 'construct'):
+      return self._head.construct(**bindings)
+    else:
+      raise ValueError(
+          'Cannot call construct on a non-template: %s' % type(self._head))
+
   @property
   def layer_parameters(self):
     return self._head.layer_parameters
@@ -1683,9 +1659,9 @@ class VarStoreMethod(object):
       if train is None:
         train = _defaults.get('trainable_variables', True)
       variable_collections = _defaults.get('variable_collections', ())
-      if tf.GraphKeys.VARIABLES not in variable_collections:
+      if tf.GraphKeys.GLOBAL_VARIABLES not in variable_collections:
         variable_collections = list(variable_collections) + [
-            tf.GraphKeys.VARIABLES]
+            tf.GraphKeys.GLOBAL_VARIABLES]
 
       v = tf.get_variable(var_name,
                           shape=shape,
@@ -1744,9 +1720,21 @@ def _remove_first_arg_from_doc(func):
   if not func.__doc__:
     return
   start = func.__doc__.find(arg_string)
+
   if start >= 0:
     start += len(arg_string)
+    indent = 0
+    # Find the prefix. Our standard docs indent multiline argument descriptions
+    # 2 spaces further than single line.
+    for i in xrange(len(func.__doc__) - start):
+      x = func.__doc__[i + start]
+      if x != ' ':
+        indent = i
+        break
+    prefix = ' ' * (indent + 1)
     end = func.__doc__.find('\n', start) + 1
+    while func.__doc__[end:].startswith(prefix):
+      end = func.__doc__.find('\n', end) + 1
     if end > 0:
       func.__doc__ = func.__doc__[:start] + func.__doc__[end:]
 
@@ -1855,6 +1843,7 @@ class _RegisterBase(object):
       argspec = inspect.getargspec(func)
       args = argspec.args[1:]
     name = self._method_name if self._method_name else self._name
+    self._name = name
     method.__module__ = obj.__module__
     method.__name__ = name
     _set_ipython_string(method, args, argspec.defaults, doc)
@@ -2027,7 +2016,7 @@ def _conversion_function(pt_wrapper, dtype=None, name=None, as_ref=False):
   # Ignore as_ref to not create backward compatibility issues.
   _ = name, as_ref
   t = pt_wrapper.tensor
-  if dtype and not t.dtype.is_compatible_with(dtype):
+  if dtype and not dtype.is_compatible_with(t.dtype):
     raise ValueError(
         'Tensor conversion requested dtype %s for Tensor with dtype %s: %r' %
         (dtype, t.dtype, t))

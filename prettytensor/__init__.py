@@ -23,6 +23,7 @@ from __future__ import print_function
 
 # pylint: disable=unused-import
 from prettytensor import funcs
+from prettytensor import parameters
 from prettytensor import train
 from prettytensor.bookkeeper import apply_optimizer
 from prettytensor.bookkeeper import Bookkeeper
@@ -57,3 +58,5 @@ from prettytensor.pretty_tensor_class import wrap_sequence
 
 from prettytensor.pretty_tensor_normalization_methods import BatchNormalizationArguments
 from prettytensor.scopes import make_template
+
+__version__ = '0.7.1'

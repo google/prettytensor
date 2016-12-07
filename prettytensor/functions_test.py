@@ -75,7 +75,7 @@ class TensorFlowOpTest(tf.test.TestCase):
     testing.assert_allclose(
         out[0],
         numpy.array([4., 4., 4., 12.]),
-        rtol=TOLERANCE)
+        rtol=TOLERANCE, atol=TOLERANCE)
 
   def test_binary_cross_entropy_loss_with_logits(self):
     n1 = numpy.array([2., 3., 4., 5., -6., -7.], dtype=numpy.float32)
@@ -103,12 +103,12 @@ class TensorFlowOpTest(tf.test.TestCase):
             1.))
     np_values = numpy.log(1. + numpy.exp(values))
     np_values[6] = 100.
-    testing.assert_allclose(out[0], np_values, rtol=TOLERANCE)
+    testing.assert_allclose(out[0], np_values, rtol=TOLERANCE, atol=TOLERANCE)
 
     out = self.eval_tensor(functions.softplus(tf.constant(values), 2.))
     np_values = numpy.log(1. + numpy.exp(values * 2.)) / 2.
     np_values[6] = 100.
-    testing.assert_allclose(out[0], np_values, rtol=TOLERANCE)
+    testing.assert_allclose(out[0], np_values, rtol=TOLERANCE, atol=TOLERANCE)
 
   def test_cos_distance(self):
     n1 = numpy.array([[1., 2., 3., 4.], [1., 1., 1., 1.]], dtype=numpy.float32)
@@ -118,7 +118,7 @@ class TensorFlowOpTest(tf.test.TestCase):
     testing.assert_allclose(
         out[0],
         numpy.array([cosine(n1[0], n2[0]), cosine(n1[1], n2[1])]),
-        rtol=TOLERANCE)
+        rtol=TOLERANCE, atol=TOLERANCE)
 
   def test_l1_distance(self):
     n1 = numpy.array([[1., 2., 3., 4.], [1., 1., 1., 1.]], dtype=numpy.float32)
@@ -129,7 +129,7 @@ class TensorFlowOpTest(tf.test.TestCase):
         numpy.array(
             [cityblock(n1[0], n2[0]), cityblock(n1[1], n2[1])
             ]),
-        rtol=TOLERANCE)
+        rtol=TOLERANCE, atol=TOLERANCE)
 
   def test_l2_distance(self):
     n1 = numpy.array([[1., 2., 3., 4.], [1., 1., 1., 1.]], dtype=numpy.float32)
@@ -141,7 +141,7 @@ class TensorFlowOpTest(tf.test.TestCase):
             [euclidean(n1[0], n2[0]),
              1e-6  # Epsilon sets the minimum distance so use that instead of 0.
             ]),
-        rtol=TOLERANCE)
+        rtol=TOLERANCE, atol=TOLERANCE)
 
   def test_l2_distance_sq(self):
     n1 = numpy.array([[1., 2., 3., 4.], [1., 1., 1., 1.]], dtype=numpy.float32)
@@ -153,7 +153,7 @@ class TensorFlowOpTest(tf.test.TestCase):
             numpy.array(
                 [euclidean(n1[0], n2[0]), euclidean(
                     n1[1], n2[1])]), 2),
-        rtol=TOLERANCE)
+        rtol=TOLERANCE, atol=TOLERANCE)
 
   def test_dot_distance(self):
     n1 = numpy.array([[1., 2., 3., 4.], [1., 1., 1., 1.]], dtype=numpy.float32)
@@ -163,7 +163,7 @@ class TensorFlowOpTest(tf.test.TestCase):
         out[0],
         numpy.array(-numpy.sum(n1 * n2,
                                axis=1)),
-        rtol=TOLERANCE)
+        rtol=TOLERANCE, atol=TOLERANCE)
 
   def test_cos_distance_with_broadcast(self):
     n1 = numpy.array([[[1., 2., 3., 4.], [1., 1., 1., 1.]], [[5., 6., 7., 8.],
@@ -223,7 +223,7 @@ class TensorFlowOpTest(tf.test.TestCase):
         out[0],
         numpy.array(-numpy.sum(n1 * n2,
                                axis=2)),
-        rtol=TOLERANCE)
+        rtol=TOLERANCE, atol=TOLERANCE)
 
   def test_l2_normalize(self):
     n1 = numpy.array([[1., 2., 3., 4.], [1., 1., 1., 1.]], dtype=numpy.float32)
@@ -232,7 +232,7 @@ class TensorFlowOpTest(tf.test.TestCase):
     testing.assert_allclose(
         out[0],
         n1 / linalg.norm(n1, 2, axis=1).reshape((2, 1)),
-        rtol=TOLERANCE)
+        rtol=TOLERANCE, atol=TOLERANCE)
 
   def test_l1_normalize(self):
     n1 = numpy.array([[1., 2., 3., 4.], [1., 1., 1., 1.]], dtype=numpy.float32)
@@ -241,7 +241,7 @@ class TensorFlowOpTest(tf.test.TestCase):
     testing.assert_allclose(
         out[0],
         n1 / linalg.norm(n1, 1, axis=1).reshape((2, 1)),
-        rtol=TOLERANCE)
+        rtol=TOLERANCE, atol=TOLERANCE)
 
   def test_leaky_relu(self):
     values = (
@@ -253,7 +253,7 @@ class TensorFlowOpTest(tf.test.TestCase):
     for i, value in enumerate(values):
       if value < 0:
         values[i] *= 0.01
-    testing.assert_allclose(out[0], values, rtol=TOLERANCE)
+    testing.assert_allclose(out[0], values, rtol=TOLERANCE, atol=TOLERANCE)
 
   def test_unzip(self):
     n1 = numpy.array([[1., 2.], [3., 4.], [5., 6.], [7., 8.]],
@@ -262,9 +262,9 @@ class TensorFlowOpTest(tf.test.TestCase):
     out = self.eval_tensor(functions.unzip(t1, 0, 4, 2))
 
     expected = numpy.array([[1., 2.], [5., 6.]], dtype=numpy.float32)
-    testing.assert_allclose(expected, out[0], rtol=TOLERANCE)
+    testing.assert_allclose(expected, out[0], rtol=TOLERANCE, atol=TOLERANCE)
     expected = numpy.array([[3., 4.], [7., 8.]], dtype=numpy.float32)
-    testing.assert_allclose(expected, out[1], rtol=TOLERANCE)
+    testing.assert_allclose(expected, out[1], rtol=TOLERANCE, atol=TOLERANCE)
 
   def test_split(self):
     """Testing TF functionality to highlight difference with Unzip."""
@@ -273,9 +273,9 @@ class TensorFlowOpTest(tf.test.TestCase):
     t1 = tf.constant(n1)
     out = self.eval_tensor(tf.split(0, 2, t1))
     expected = numpy.array([[1., 2.], [3., 4.]], dtype=numpy.float32)
-    testing.assert_allclose(expected, out[0], rtol=TOLERANCE)
+    testing.assert_allclose(expected, out[0], rtol=TOLERANCE, atol=TOLERANCE)
     expected = numpy.array([[5., 6.], [7., 8.]], dtype=numpy.float32)
-    testing.assert_allclose(expected, out[1], rtol=TOLERANCE)
+    testing.assert_allclose(expected, out[1], rtol=TOLERANCE, atol=TOLERANCE)
 
 
 if __name__ == '__main__':

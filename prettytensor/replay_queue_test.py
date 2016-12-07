@@ -26,7 +26,7 @@ class ReplayableQueueTest(tf.test.TestCase):
     replay = pt.train.ReplayableQueue.build_from_queue(q, 100, 10)
 
     with self.test_session() as sess:
-      sess.run(tf.initialize_all_variables())
+      sess.run(tf.global_variables_initializer())
 
       sess.run(enqueue)
 

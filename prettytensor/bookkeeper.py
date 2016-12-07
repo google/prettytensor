@@ -40,8 +40,8 @@ class GraphKeys(object):
   MARKED_LOSSES = 'marked_losses'
   RECURRENT_STATE_VARIABLES = 'recurrent_state_variables'
   REGULARIZATION_LOSSES = 'regularization_losses'
-  TEST_VARIABLES = 'test_variables'
-  UPDATE_OPS = 'updates'
+  TEST_VARIABLES = tf.GraphKeys.LOCAL_VARIABLES
+  UPDATE_OPS = tf.GraphKeys.UPDATE_OPS
 
 EPSILON = 0.00001
 
@@ -98,18 +98,11 @@ def for_new_graph(*args, **kwargs):
 class Bookkeeper(object):
   """Small class to gather needed pieces from a Graph being built.
 
-  The following properties are exposed:
-
-  * batch_size: The size of the batches.
-  * bits: A dict where named layers and losses can be placed for reference
-      later.
-  * global_step: A global step counter. Every time training is executed is
-      considered a step.
-  * g: The graph.
-  * train_op: The training operation, if setup_training was called.
-  * loss: A list of losses.
-  * summary_collections: Sets the default tag for all summaries created after
-    this point. Use `None` to disable summaries.
+  This class is mostly an implementation detail of Pretty Tensor and almost
+  never needs to be used when building a model. Most of the useful methods
+  are exposed in the `pt` namespace. The most common usecase for directly
+  calling a Bookkeeper methods are to create summaries in the same way as
+  Pretty Tensor that are controlled by the `pt.defaults_scope`.
   """
 
   def __init__(self,
@@ -132,7 +125,7 @@ class Bookkeeper(object):
     self._train_op = None
     # List of summaries to collect.
     self._summary_tags = set()
-    if global_step and global_step.dtype not in (tf.int32_ref, tf.int64_ref):
+    if global_step and global_step.dtype.base_dtype not in (tf.int32, tf.int64):
       raise ValueError('Global step must be an int32 or int64 variable: %s' %
                        global_step.dtype)
     self._global_step = global_step
@@ -295,7 +288,7 @@ class Bookkeeper(object):
     with self._g.as_default():
       if decay < 0 or decay >= 1.0:
         raise ValueError('Decay is %5.2f, but has to be in [0, 1).' % decay)
-      if not avg_var:
+      if avg_var is None:
         avg_name = '%s_average' % _bare_var_name(var)
         with tf.control_dependencies(None):
           with tf.name_scope(avg_name + '/Initializer/'):
@@ -314,7 +307,7 @@ class Bookkeeper(object):
                                            (10.0 + num_updates)))
       with tf.device(avg_var.device):
         if ignore_nan:
-          var = tf.select(tf.is_finite(var), var, avg_var)
+          var = tf.where(tf.is_finite(var), var, avg_var)
         if var.get_shape().is_fully_defined():
           avg_update = tf.assign_sub(avg_var, (1 - decay) * (avg_var - var))
         else:
@@ -334,8 +327,7 @@ class Bookkeeper(object):
     Args:
        var: The variable for which a moving average should be computed.
        tag: The tag of the summary. If None var.name[:-2] is used to strip off
-         the ':0' that is added by TF (bookkeeper keeps all var names unique, so
-         it is only ever the first one.)
+         the ':0' that is added by TF.
        decay: How much history to use in the moving average.
          Higher, means more history values [0.9, 1) accepted.
        ignore_nan: If the value is NaN or Inf, skip it. Note that this default
@@ -355,7 +347,7 @@ class Bookkeeper(object):
                                                 ignore_nan=ignore_nan)
       if tag is None:
         tag = _bare_var_name(avg_var)
-      tag = self.g.unique_name(tag)
+        tag = self.g.unique_name(tag)
       self.add_scalar_summary(avg_var, tag)
       return avg_var
 
@@ -596,6 +588,7 @@ def apply_optimizer(optimizer,
                     losses,
                     regularize=True,
                     include_marked=True,
+                    clip_gradients_by_norm=None,
                     **kwargs):
   """Apply an optimizer to the graph and returns a train_op.
 
@@ -622,6 +615,8 @@ def apply_optimizer(optimizer,
     losses: A list of losses to apply.
     regularize: Whether or not to include the regularization losses.
     include_marked: Whether or not to use the marked losses.
+    clip_gradients_by_norm: If not None, clip gradients by the norm using
+      `tf.clip_by_norm`.
     **kwargs: Additional arguments to pass into the optimizer.
   Returns:
     An operation to use for training that also updates any required ops such as
@@ -629,13 +624,29 @@ def apply_optimizer(optimizer,
   """
   books = for_default_graph()
 
-  if 'global_step' not in kwargs:
-    kwargs['global_step'] = books.global_step
-  train_op = optimizer.minimize(
-      books.create_composite_loss(losses=losses,
-                                  regularize=regularize,
-                                  include_marked=include_marked),
-      **kwargs)
+  g_step = kwargs.pop('global_step', books.global_step)
+  total_loss = books.create_composite_loss(losses=losses,
+                                           regularize=regularize,
+                                           include_marked=include_marked)
+
+  grads_and_vars = optimizer.compute_gradients(total_loss, **kwargs)
+  if clip_gradients_by_norm is not None:
+    clipped_grads_and_vars = []
+    for g, v in grads_and_vars:
+      if isinstance(g, tf.SparseTensor):
+        cg = tf.SparseTensor(
+            tf.clip_by_norm(g.values, clip_gradients_by_norm),
+            g.indices,
+            g.shape)
+      elif isinstance(g, tf.IndexedSlices):
+        cg = tf.IndexedSlices(
+            tf.clip_by_norm(g.values, clip_gradients_by_norm),
+            g.indices)
+      else:
+        cg = tf.clip_by_norm(g, clip_gradients_by_norm)
+      clipped_grads_and_vars.append((cg, v))
+    grads_and_vars = clipped_grads_and_vars
+  train_op = optimizer.apply_gradients(grads_and_vars, global_step=g_step)
   return books.with_update_ops(train_op)
 
 

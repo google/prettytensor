@@ -18,6 +18,7 @@ import tensorflow as tf
 
 from prettytensor import functions
 from prettytensor import bookkeeper
+from prettytensor import parameters
 from prettytensor import pretty_tensor_class as prettytensor
 from prettytensor.pretty_tensor_class import Phase
 from prettytensor.pretty_tensor_class import PROVIDED
@@ -43,21 +44,21 @@ class SampledSoftmaxResult(
   pass
 
 
-def _convert_and_assert_tensors_compatible(input_layer, target):
-  target = tf.convert_to_tensor(target, dtype=input_layer.dtype)
-  if not input_layer.get_shape().is_compatible_with(target.get_shape()):
-    raise ValueError('target and input_layer are not compatible: %s != %s' %
-                     (input_layer.get_shape(), target.get_shape()))
+def _convert_and_assert_tensors_compatible(input_, target):
+  target = tf.convert_to_tensor(target, dtype=input_.dtype)
+  if not input_.get_shape().is_compatible_with(target.get_shape()):
+    raise ValueError('target and input_ are not compatible: %s != %s' %
+                     (input_.get_shape(), target.get_shape()))
   return target
 
 
 def _convert_and_assert_per_example_weights_compatible(
-    input_layer, per_example_weights, dtype):
+    input_, per_example_weights, dtype):
   """Converts per_example_weights to a tensor and validates the shape."""
   per_example_weights = tf.convert_to_tensor(
       per_example_weights, name='per_example_weights', dtype=dtype)
-  if input_layer.get_shape().ndims:
-    expected_length = input_layer.get_shape().dims[0]
+  if input_.get_shape().ndims:
+    expected_length = input_.get_shape().dims[0]
     message = ('per_example_weights must have rank 1 and length %s, but was: %s'
                % (expected_length, per_example_weights.get_shape()))
   else:
@@ -75,7 +76,7 @@ def _convert_and_assert_per_example_weights_compatible(
   return per_example_weights
 
 
-def apply_regression(input_layer,
+def apply_regression(input_,
                      regression_fn,
                      target,
                      regression_args=(),
@@ -87,7 +88,7 @@ def apply_regression(input_layer,
 
   This does not change tensor.
   Args:
-    input_layer: The chainable object.
+    input_: A Tensor or a Pretty Tensor holding the input.
     regression_fn: A function that takes (in order) tensor, labels.
     target: The targe of the regression.
     regression_args: Other arguments for the regression.
@@ -98,22 +99,22 @@ def apply_regression(input_layer,
   Returns:
     The loss tensor's name.
   Raises:
-    ValueError: If the target is not a compatible shape with input_layer.
+    ValueError: If the target is not a compatible shape with input_.
   """
   if regression_kwargs is None:
     regression_kwargs = {}
   if name is not None and 'name' not in regression_kwargs:
     regression_kwargs['name'] = name
   elif name is None:
-    name = input_layer.tensor.op.name
+    name = input_.tensor.op.name
 
-  tensor = input_layer.tensor
+  tensor = input_.tensor
   loss = regression_fn(tensor, target, *regression_args, **regression_kwargs)
   if loss_weight is not None:
     loss *= loss_weight
   if per_example_weights is not None:
     per_example_weights = _convert_and_assert_per_example_weights_compatible(
-        input_layer,
+        input_,
         per_example_weights,
         dtype=loss.dtype)
     loss *= per_example_weights
@@ -126,16 +127,16 @@ def apply_regression(input_layer,
     avg_loss = tf.reduce_sum(loss) / tensor.get_shape()[0].value
   else:
     avg_loss = tf.reduce_mean(loss)
-  return input_layer.add_loss(avg_loss, name=name)
+  return input_.add_loss(avg_loss, name=name)
 
 
 @prettytensor.Register
 def l2_regression(
-    input_layer, target, name=PROVIDED, loss_weight=None,
+    input_, target, name=PROVIDED, loss_weight=None,
     per_example_weights=None):
   """Applies an L2 Regression (Sum of Squared Error) to the target."""
-  target = _convert_and_assert_tensors_compatible(input_layer, target)
-  return apply_regression(input_layer,
+  target = _convert_and_assert_tensors_compatible(input_, target)
+  return apply_regression(input_,
                           functions.l2_regression_sq_loss,
                           target,
                           [],
@@ -146,11 +147,11 @@ def l2_regression(
 
 @prettytensor.Register
 def l1_regression(
-    input_layer, target, name=PROVIDED, loss_weight=None,
+    input_, target, name=PROVIDED, loss_weight=None,
     per_example_weights=None):
   """Applies an L1 Regression (Sum of Absolute Error) to the target."""
-  target = _convert_and_assert_tensors_compatible(input_layer, target)
-  return apply_regression(input_layer,
+  target = _convert_and_assert_tensors_compatible(input_, target)
+  return apply_regression(input_,
                           functions.l1_regression_loss,
                           target,
                           [],
@@ -160,28 +161,28 @@ def l1_regression(
 
 
 @prettytensor.Register
-def softmax_activation(input_layer):
+def softmax_activation(input_):
   """Computes the softmax.
 
   Args:
-    input_layer: The input PrettyTensor.
+    input_: A rank 2 `Tensor` or a Pretty Tensor holding the logits.
   Returns:
     A new Pretty Tensor with the softmax applied.
   """
-  return input_layer.with_tensor(tf.nn.softmax(input_layer))
+  return input_.with_tensor(tf.nn.softmax(input_))
 
 
 @prettytensor.Register
-def cross_entropy(input_layer,
+def cross_entropy(input_,
                   labels,
                   name=PROVIDED,
                   loss_weight=None,
                   per_example_weights=None):
-  """Calculates the Cross Entropy of the input_layer vs inputs.
+  """Calculates the Cross Entropy of input_ vs labels.
 
   Args:
-    input_layer: The input PrettyTensor.
-    labels: A Float or Double tensor containing the labels.
+    input_: A rank 2 `Tensor` or a Pretty Tensor holding the logits.
+    labels: A rank 2 tf.float32 or tf.float64 tensor containing the labels.
     name: The optional name.
     loss_weight: A weight to scale the loss. Used when there are multiple
       losses.
@@ -193,21 +194,21 @@ def cross_entropy(input_layer,
   """
   if labels is None:
     raise ValueError('Labels must be set')
-  labels = _convert_and_assert_tensors_compatible(input_layer, labels)
+  labels = _convert_and_assert_tensors_compatible(input_, labels)
 
   if per_example_weights is not None:
     per_example_weights = _convert_and_assert_per_example_weights_compatible(
-        input_layer,
+        input_,
         per_example_weights,
-        dtype=input_layer.dtype)
+        dtype=input_.dtype)
 
   correct_predictions, examples = _compute_average_correct(
-      input_layer, labels, per_example_weights)
+      input_, labels, per_example_weights)
   correct_ratio = correct_predictions / examples
   if correct_ratio.get_shape().is_fully_defined():
-    input_layer.bookkeeper.add_average_summary(
+    input_.bookkeeper.add_average_summary(
         correct_ratio, 'average_accuracy_%s' % name)
-  return apply_regression(input_layer,
+  return apply_regression(input_,
                           tf.nn.softmax_cross_entropy_with_logits,
                           labels,
                           [],
@@ -217,25 +218,64 @@ def cross_entropy(input_layer,
 
 
 @prettytensor.Register
-def binary_cross_entropy_with_logits(input_layer,
+def sparse_cross_entropy(input_,
+                         labels,
+                         name=PROVIDED,
+                         loss_weight=None,
+                         per_example_weights=None):
+  """Calculates the Cross Entropy of input_ vs labels.
+
+  Args:
+    input_: A rank 2 `Tensor` or a Pretty Tensor holding the logits.
+    labels: A rank 1 integer `Tensor` with class ordinals
+    name: The optional name.
+    loss_weight: A weight to scale the loss. Used when there are multiple
+      losses.
+    per_example_weights: A weighting for each example.
+  Returns:
+    A loss.
+  Raises:
+    ValueError: if labels is None or the type is not float or double.
+  """
+  if labels is None:
+    raise ValueError('Labels must be set')
+
+  if per_example_weights is not None:
+    per_example_weights = _convert_and_assert_per_example_weights_compatible(
+        input_,
+        per_example_weights,
+        dtype=input_.dtype)
+
+  return apply_regression(input_,
+                          tf.nn.sparse_softmax_cross_entropy_with_logits,
+                          labels,
+                          [],
+                          name='%s_loss' % name,
+                          loss_weight=loss_weight,
+                          per_example_weights=per_example_weights)
+
+
+@prettytensor.Register
+def binary_cross_entropy_with_logits(input_,
                                      target,
                                      name=PROVIDED,
                                      loss_weight=None,
                                      per_example_weights=None,
                                      per_output_weights=None):
-  """Calculates the binary cross entropy of the input_layer vs inputs.
+  """Calculates the binary cross entropy of the input_ vs inputs.
 
   Expects unscaled logits. Do not pass in results of sigmoid operation.
 
   Args:
-    input_layer: The input pre-sigmoid PrettyTensor.
-    target: A Float or Double tensor containing class label probabilities. Note
-      that binary cross entropy is equivalent to logistic loss.
+    input_: A rank 2 Tensor or a Pretty Tensor holding the logits.
+    target: A rank 2 tf.float32 or tf.float64 tensor containing class label
+      probabilities. Note that binary cross entropy is equivalent to logistic
+      loss.
     name: The optional name.
     loss_weight: A scalar multiplier for the loss.
     per_example_weights: A `Tensor` with a weight per example.
     per_output_weights: A weight `Tensor` that is the same shape as the
-      input_layer that can be used to scale individual prediction losses.  See
+      input_ that can be used to scale individual prediction losses.  See
       `tf.tile` to turn a per-column weight vector into a `per_output_weights`
       `Tensor`.
   Returns:
@@ -245,27 +285,27 @@ def binary_cross_entropy_with_logits(input_layer,
   """
   if target is None:
     raise ValueError('target must be set')
-  target = _convert_and_assert_tensors_compatible(input_layer, target)
+  target = _convert_and_assert_tensors_compatible(input_, target)
 
   with tf.name_scope('stats'):
     selected, sum_retrieved, sum_relevant = _compute_precision_recall(
-        input_layer, target, 0, per_example_weights)
+        input_, target, 0, per_example_weights)
     precision = selected / sum_retrieved
     recall = selected / sum_relevant
     if precision.get_shape().is_fully_defined():
-      input_layer.bookkeeper.add_average_summary(
+      input_.bookkeeper.add_average_summary(
           precision, 'average_precision_%s' % name)
     if recall.get_shape().is_fully_defined():
-      input_layer.bookkeeper.add_average_summary(
+      input_.bookkeeper.add_average_summary(
           recall, 'average_recall_%s' % name)
-    input_layer.bookkeeper.add_scalar_summary(
-        tf.reduce_sum(tf.to_float(tf.greater(input_layer, 0))), 'activations')
+    input_.bookkeeper.add_scalar_summary(
+        tf.reduce_sum(tf.to_float(tf.greater(input_, 0))), 'activations')
     if per_output_weights is not None:
       per_output_weights = tf.convert_to_tensor(
           per_output_weights,
           name='per_output_weights',
-          dtype=input_layer.dtype.base_dtype)
-      input_layer.get_shape().assert_is_compatible_with(
+          dtype=input_.dtype.base_dtype)
+      input_.get_shape().assert_is_compatible_with(
           per_output_weights.get_shape())
 
   def _batch_sum_bce(x, target, name='binary_cross_entropy'):
@@ -277,7 +317,7 @@ def binary_cross_entropy_with_logits(input_layer,
     return functions.reduce_batch_sum(logits)
 
   return apply_regression(
-      input_layer,
+      input_,
       _batch_sum_bce,
       target,
       [],
@@ -286,19 +326,21 @@ def binary_cross_entropy_with_logits(input_layer,
       per_example_weights=per_example_weights)
 
 
-@prettytensor.RegisterCompoundOp
-def softmax_classifier_with_sampled_loss(inputs,
-                                         num_classes,
-                                         labels,
-                                         num_sampled,
-                                         num_true=None,
-                                         sampled_values=None,
-                                         remove_accidental_hits=True,
-                                         loss_weight=None,
-                                         per_example_weights=None,
-                                         weight_init=None,
-                                         bias_init=tf.zeros_initializer,
-                                         name='softmax_classifier'):
+@prettytensor.RegisterCompoundOp(assign_defaults=('parameter_modifier',))
+def softmax_classifier_with_sampled_loss(
+    inputs,
+    num_classes,
+    labels,
+    num_sampled,
+    num_true=None,
+    sampled_values=None,
+    remove_accidental_hits=True,
+    loss_weight=None,
+    per_example_weights=None,
+    weights=None,
+    bias=tf.zeros_initializer,
+    parameter_modifier=parameters.identity,
+    name='softmax_classifier'):
   """Applies softmax and if labels is not None, then it adds a sampled loss.
 
   This is a faster way to train a softmax classifier over a huge number of
@@ -337,9 +379,10 @@ def softmax_classifier_with_sampled_loss(inputs,
         True.
     loss_weight: A scalar multiplier for the loss.
     per_example_weights: A Tensor with a weight per example.
-    weight_init: The initializer for the weights (see `fully_connected`). Note:
+    weights: The initializer for the weights (see `fully_connected`). Note:
       This is the transpose of a normal fully_connected input layer!
-    bias_init: The initializer for the bias (see `fully_connected`).
+    bias: The initializer for the bias (see `fully_connected`).
+    parameter_modifier: A modifier for the parameters that compute the logits.
     name: The optional name.
   Returns:
     A tuple of handles to the logits (fully connected layer) and loss.
@@ -354,8 +397,9 @@ def softmax_classifier_with_sampled_loss(inputs,
                                   activation_fn=None,
                                   name=name,
                                   transpose_weights=True,
-                                  init=weight_init,
-                                  bias_init=bias_init)
+                                  weights=weights,
+                                  bias=bias,
+                                  parameter_modifier=parameter_modifier)
     if labels is not None:
       labels = tf.convert_to_tensor(labels, dtype=tf.int64, name='labels')
       labels.get_shape().assert_is_compatible_with([input_copy.get_shape()[0],
@@ -392,29 +436,46 @@ def softmax_classifier_with_sampled_loss(inputs,
   return SampledSoftmaxResult(full, loss)
 
 
-@prettytensor.RegisterCompoundOp
-def softmax_classifier(
-    input_layer, class_count, labels=None, name=PROVIDED, loss_weight=None,
-    per_example_weights=None, weight_init=None, bias_init=tf.zeros_initializer):
+@prettytensor.RegisterCompoundOp(assign_defaults=('parameter_modifier',))
+def softmax_classifier(input_,
+                       num_classes,
+                       labels=None,
+                       loss_weight=None,
+                       per_example_weights=None,
+                       weights=None,
+                       bias=tf.zeros_initializer,
+                       parameter_modifier=parameters.identity,
+                       name=PROVIDED):
   """Creates a fully-connected linear layer followed by a softmax.
 
+  This returns `(softmax, loss)` where `loss` is the cross entropy loss.
+
   Args:
-    input_layer: The chainable object, supplied.
-    class_count: The number of classes.
+    input_: A rank 2 Tensor or a Pretty Tensor holding the activation before
+      the logits (penultimate layer).
+    num_classes: The number of classes.
     labels: The target labels to learn as a float tensor.  Use None to not
       include a training loss.
-    name: The optional name.
     loss_weight: A scalar multiplier for the loss.
     per_example_weights: A Tensor with a weight per example.
-    weight_init: The initializer for the weights (see `fully_connected`).
-    bias_init: The initializer for the bias (see `fully_connected`).
+    weights: The initializer for the weights (see `fully_connected`).
+    bias: The initializer for the bias (see `fully_connected`).
+    parameter_modifier: A modifier for the parameters that compute the logits.
+    name: The optional name.
   Returns:
-    A tuple of the softmax's name and the loss tensor's name in m.bits.
+    A named tuple holding:
+
+    softmax: The result of this layer with softmax normalization.
+    loss: The cross entropy loss.
   Raises:
     ValueError: If the datatype is wrong.
   """
-  full = input_layer.fully_connected(class_count, activation_fn=None, name=name,
-                                     init=weight_init, bias_init=bias_init)
+  full = input_.fully_connected(num_classes,
+                                activation_fn=None,
+                                name=name,
+                                weights=weights,
+                                bias=bias,
+                                parameter_modifier=parameter_modifier)
   return full.softmax(labels=labels,
                       loss_weight=loss_weight,
                       per_example_weights=per_example_weights,
@@ -422,7 +483,7 @@ def softmax_classifier(
 
 
 @prettytensor.RegisterCompoundOp
-def softmax(input_layer,
+def softmax(input_,
             labels=None,
             name=PROVIDED,
             loss_weight=None,
@@ -430,7 +491,7 @@ def softmax(input_layer,
   """Applies softmax and if labels is not None, then it also adds a loss.
 
   Args:
-    input_layer: The chainable object, supplied.
+    input_: A rank 2 Tensor or a Pretty Tensor holding the logits.
     labels: The target labels to learn as a float tensor.  Use None to not
       include a training loss.
     name: The optional name.
@@ -443,19 +504,19 @@ def softmax(input_layer,
   """
   if labels is not None:
     # Cache the current layer because we only want softmax to change the head.
-    full = input_layer.as_layer()
-    return SoftmaxResult(input_layer.softmax_activation(),
+    full = input_.as_layer()
+    return SoftmaxResult(input_.softmax_activation(),
                          full.cross_entropy(
                              labels,
                              name=name,
                              loss_weight=loss_weight,
                              per_example_weights=per_example_weights))
   else:
-    return SoftmaxResult(input_layer.softmax_activation(), None)
+    return SoftmaxResult(input_.softmax_activation(), None)
 
 
 @prettytensor.Register(assign_defaults=('phase',))
-def evaluate_precision_recall(input_layer,
+def evaluate_precision_recall(input_,
                               labels,
                               threshold=0.5,
                               per_example_weights=None,
@@ -464,7 +525,7 @@ def evaluate_precision_recall(input_layer,
   """Computes the precision and recall of the prediction vs the labels.
 
   Args:
-    input_layer: A Pretty Tensor object.
+    input_: A rank 2 Tensor or a Pretty Tensor holding the result of the model.
     labels: The target labels to learn as a float tensor.
     threshold: The threshold to use to decide if the prediction is true.
     per_example_weights: A Tensor with a weight per example.
@@ -476,7 +537,7 @@ def evaluate_precision_recall(input_layer,
   """
   _ = name  # Eliminate warning, name used for namescoping by PT.
   selected, sum_retrieved, sum_relevant = _compute_precision_recall(
-      input_layer, labels, threshold, per_example_weights)
+      input_, labels, threshold, per_example_weights)
 
   if phase != Phase.train:
     dtype = tf.float32
@@ -503,50 +564,25 @@ def evaluate_precision_recall(input_layer,
         collections=[bookkeeper.GraphKeys.TEST_VARIABLES],
         trainable=False)
 
-    with input_layer.g.device(selected_count.device):
+    with input_.g.device(selected_count.device):
       selected = tf.assign_add(selected_count, selected)
-    with input_layer.g.device(retrieved_count.device):
+    with input_.g.device(retrieved_count.device):
       sum_retrieved = tf.assign_add(retrieved_count, sum_retrieved)
-    with input_layer.g.device(relevant_count.device):
+    with input_.g.device(relevant_count.device):
       sum_relevant = tf.assign_add(relevant_count, sum_relevant)
 
-  return (tf.select(tf.equal(sum_retrieved, 0),
-                    tf.zeros_like(selected),
-                    selected/sum_retrieved),
-          tf.select(tf.equal(sum_relevant, 0),
-                    tf.zeros_like(selected),
-                    selected/sum_relevant))
+  return (tf.where(tf.equal(sum_retrieved, 0),
+                   tf.zeros_like(selected),
+                   selected/sum_retrieved),
+          tf.where(tf.equal(sum_relevant, 0),
+                   tf.zeros_like(selected),
+                   selected/sum_relevant))
 
 
-@prettytensor.Register(assign_defaults=('phase',))
-def evaluate_classifier(input_layer, labels, per_example_weights=None,
-                        topk=1, name=PROVIDED, phase=Phase.train):
-  """Calculates the total ratio of correct predictions across all examples seen.
-
-  In test and infer mode, this creates variables in the graph collection
-  pt.GraphKeys.TEST_VARIABLES and does not add them to
-  tf.GraphKeys.ALL_VARIABLES.  This means that you must initialize them
-  separately from tf.initialize_all_variables().
-
-  In the case of `topk == 1`, this breaks ties left-to-right, in all other cases
-  it follows `tf.nn.in_top_k`. *Note*: the tie behavior will change in the
-  future.
-
-  Args:
-    input_layer: The input_layer.
-    labels: A float or double tensor containing the target for this layer.
-    per_example_weights: Weights that are applied to every example.
-    topk: Integer k for 'accuracy at top k' metric.
-    name: The name of this layer.
-    phase: In training mode the batch accuracy is returned and in eval/infer
-      modes a total average is calculated.
-  Returns:
-    A Pretty Tensor with the ratio of correct to total examples seen.
-  """
-  correct_predictions, examples = _compute_average_correct(
-      input_layer, labels, per_example_weights, topk=topk)
-  parameters = {}
-  if phase != Phase.train:
+def _eval_metric(input_, topk, correct_predictions, examples, phase):
+  """Creates the standard tracking varibles if in test and returns accuracy."""
+  my_parameters = {}
+  if phase in (Phase.test, Phase.infer):
     dtype = tf.float32
     # Create the variables using tf.Variable because we don't want to share.
     count = tf.Variable(tf.constant(0, dtype=dtype),
@@ -557,30 +593,193 @@ def evaluate_classifier(input_layer, labels, per_example_weights=None,
                           name='correct_%d' % topk,
                           collections=[bookkeeper.GraphKeys.TEST_VARIABLES],
                           trainable=False)
-    parameters['count'] = count
-    parameters['correct'] = correct
-    with input_layer.g.device(count.device):
+    my_parameters['count'] = count
+    my_parameters['correct'] = correct
+    with input_.g.device(count.device):
       examples = tf.assign_add(count, examples)
-    with input_layer.g.device(correct.device):
+    with input_.g.device(correct.device):
       correct_predictions = tf.assign_add(correct, correct_predictions)
-  return input_layer.with_tensor(
-      tf.div(correct_predictions, examples, name=name), parameters)
+  return correct_predictions, examples, my_parameters
 
 
-def _compute_precision_recall(input_layer, labels, threshold,
+@prettytensor.Register(assign_defaults=('phase',))
+def evaluate_classifier_fraction(input_,
+                                 labels,
+                                 per_example_weights=None,
+                                 topk=1,
+                                 name=PROVIDED,
+                                 phase=Phase.train):
+  """Calculates the total of correct predictions and example count.
+
+  In test and infer mode, this creates variables in the graph collection
+  pt.GraphKeys.TEST_VARIABLES and does not add them to
+  tf.GraphKeys.ALL_VARIABLES.  This means that you must initialize them
+  separately from tf.global_variables_initializer().
+
+  In the case of `topk == 1`, this breaks ties left-to-right, in all other cases
+  it follows `tf.nn.in_top_k`. *Note*: the tie behavior will change in the
+  future.
+
+  Args:
+    input_: A rank 2 Tensor or a Pretty Tensor holding the result of the model.
+    labels: A float or double `Tensor` containing the target for this layer *or*
+      an integer `Tensor` with the sparse one-hot indices.
+    per_example_weights: Weights that are applied to every example.
+    topk: Integer k for 'accuracy at top k' metric.
+    name: The name of this layer.
+    phase: In training mode the batch accuracy is returned and in eval/infer
+      modes a total average is calculated.
+  Returns:
+    A Pretty Tensor that contains correct_predictions, num_examples.
+  Raises:
+    ValueError: If labels is not the correct shape.
+  """
+  _ = name  # Suppress lint
+  if not (tf.float32.is_compatible_with(labels.dtype) or
+          tf.float64.is_compatible_with(labels.dtype)):
+    raise ValueError('labels must be floating point: %s.' % labels.dtype)
+  correct_predictions, examples = _compute_average_correct(input_,
+                                                           labels,
+                                                           per_example_weights,
+                                                           topk=topk)
+  correct_predictions, examples, my_parameters = _eval_metric(
+      input_, topk, correct_predictions, examples, phase)
+  return input_.with_sequence([correct_predictions, examples], my_parameters)
+
+
+@prettytensor.Register(assign_defaults=('phase',))
+def evaluate_classifier(input_, labels, per_example_weights=None,
+                        topk=1, name=PROVIDED, phase=Phase.train):
+  """Calculates the total ratio of correct predictions across all examples seen.
+
+  In test and infer mode, this creates variables in the graph collection
+  pt.GraphKeys.TEST_VARIABLES and does not add them to
+  tf.GraphKeys.ALL_VARIABLES.  This means that you must initialize them
+  separately from tf.global_variables_initializer().
+
+  In the case of `topk == 1`, this breaks ties left-to-right, in all other cases
+  it follows `tf.nn.in_top_k`. *Note*: the tie behavior will change in the
+  future.
+
+  Args:
+    input_: A rank 2 Tensor or a Pretty Tensor holding the result of the model.
+    labels: A float or double `Tensor` containing the target for this layer.
+    per_example_weights: Weights that are applied to every example.
+    topk: Integer k for 'accuracy at top k' metric.
+    name: The name of this layer.
+    phase: In training mode the batch accuracy is returned and in eval/infer
+      modes a total average is calculated.
+  Returns:
+    A Pretty Tensor with the ratio of correct to total examples seen.
+  Raises:
+    ValueError: If labels is not the correct shape.
+  """
+  result = input_.evaluate_classifier_fraction(
+      labels,
+      per_example_weights=per_example_weights,
+      topk=topk,
+      name=name,
+      phase=phase)
+
+  return input_.with_tensor(result[0] / result[1], result.layer_parameters)
+
+
+@prettytensor.Register(assign_defaults=('phase',))
+def evaluate_classifier_fraction_sparse(input_,
+                                        labels,
+                                        per_example_weights=None,
+                                        topk=1,
+                                        name=PROVIDED,
+                                        phase=Phase.train):
+  """Calculates the total of correct predictions and example count.
+
+  In test and infer mode, this creates variables in the graph collection
+  pt.GraphKeys.TEST_VARIABLES and does not add them to
+  tf.GraphKeys.ALL_VARIABLES.  This means that you must initialize them
+  separately from tf.global_variables_initializer().
+
+  This breaks ties left-to-right.
+
+  Args:
+    input_: A rank 2 Tensor or Pretty Tensor holding the result of the
+      model.
+    labels: A float or double `Tensor` containing the target for this layer *or*
+      an integer `Tensor` with the sparse one-hot indices.
+    per_example_weights: Weights that are applied to every example.
+    topk: Integer k for 'accuracy at top k' metric.
+    name: The name of this layer.
+    phase: In training mode the batch accuracy is returned and in eval/infer
+      modes a total average is calculated.
+  Returns:
+    A Pretty Tensor that contains correct_predictions, num_examples.
+  Raises:
+    ValueError: If labels is not the correct shape.
+  """
+  _ = name  # Suppress lint
+  if not (tf.int32.is_compatible_with(labels.dtype) or
+          tf.int64.is_compatible_with(labels.dtype)):
+    raise ValueError('Labels must be an integer type.: %s.' % labels.dtype)
+  correct_predictions, examples = _compute_sparse_average_correct(
+      input_, labels, per_example_weights, topk=topk)
+  correct_predictions, examples, my_parameters = _eval_metric(
+      input_, topk, correct_predictions, examples, phase)
+  return input_.with_sequence([correct_predictions, examples], my_parameters)
+
+
+@prettytensor.Register(assign_defaults=('phase',))
+def evaluate_classifier_sparse(input_,
+                               labels,
+                               per_example_weights=None,
+                               topk=1,
+                               name=PROVIDED,
+                               phase=Phase.train):
+  """Calculates the total ratio of correct predictions across all examples seen.
+
+  In test and infer mode, this creates variables in the graph collection
+  pt.GraphKeys.TEST_VARIABLES and does not add them to
+  tf.GraphKeys.ALL_VARIABLES.  This means that you must initialize them
+  separately from tf.global_variables_initializer().
+
+  This breaks ties left-to-right.
+
+  Args:
+    input_: A rank 2 Tensor or Pretty Tensor holding the result of the model.
+    labels: An integer `Tensor` with the sparse one-hot indices as
+      [batch, num_true].
+    per_example_weights: Weights that are applied to every example.
+    topk: Integer k for 'accuracy at top k' metric.
+    name: The name of this layer.
+    phase: In training mode the batch accuracy is returned and in eval/infer
+      modes a total average is calculated.
+  Returns:
+    A Pretty Tensor with the ratio of correct to total examples seen.
+  Raises:
+    ValueError: If labels is not the correct shape.
+  """
+  result = input_.evaluate_classifier_fraction_sparse(
+      labels,
+      per_example_weights=per_example_weights,
+      topk=topk,
+      name=name,
+      phase=phase)
+
+  return input_.with_tensor(result[0] / result[1], result.layer_parameters)
+
+
+def _compute_precision_recall(input_, labels, threshold,
                               per_example_weights):
   """Returns the numerator of both, the denominator of precision and recall."""
 
   # To apply per_example_weights, we need to collapse each row to a scalar, but
   # we really want the sum.
-  labels.get_shape().assert_is_compatible_with(input_layer.get_shape())
+  labels.get_shape().assert_is_compatible_with(input_.get_shape())
   relevant = tf.to_float(tf.greater(labels, 0))
-  retrieved = tf.to_float(tf.greater(input_layer, threshold))
+  retrieved = tf.to_float(tf.greater(input_, threshold))
   selected = relevant * retrieved
 
   if per_example_weights is not None:
     per_example_weights = _convert_and_assert_per_example_weights_compatible(
-        input_layer,
+        input_,
         per_example_weights,
         dtype=None)
     per_example_weights = tf.to_float(tf.greater(per_example_weights, 0))
@@ -593,31 +792,46 @@ def _compute_precision_recall(input_layer, labels, threshold,
   return selected, sum_retrieved, sum_relevant
 
 
-def _compute_average_correct(input_layer, labels, per_example_weights, topk=1):
+def _compute_average_correct(input_, labels, per_example_weights, topk=1):
   """Returns the numerator and denominator of classifier accuracy."""
-  dtype = tf.float32
+  return _compute_sparse_average_correct(
+      input_,
+      tf.reshape(tf.argmax(labels, 1), [-1, 1]), per_example_weights, topk=topk)
+
+
+def _compute_sparse_average_correct(
+    input_, labels, per_example_weights, topk=1):
+  """Returns the numerator and denominator of classifier accuracy."""
+  labels = tf.to_int64(labels)
+  labels.get_shape().assert_is_compatible_with(
+      [input_.get_shape()[0], None])
   if topk == 1:
-    true_labels = tf.argmax(input_layer, 1)
-    predictions = tf.argmax(labels, 1)
-    in_topk = tf.equal(true_labels, predictions)
+    predictions = tf.reshape(tf.argmax(input_, 1), [-1, 1])
+    in_topk = tf.reduce_any(tf.equal(labels, predictions),
+                            reduction_indices=[1])
   else:
-    _, true_labels = tf.nn.top_k(labels, k=1)
-    true_labels = tf.reshape(true_labels, [-1])
-    in_topk = tf.nn.in_top_k(tf.cast(input_layer, dtype), true_labels, k=topk)
-  correct_predictions = tf.cast(in_topk, dtype)
+    # Use broadcasting to check if ANY of the predictions are in the top k.
+    # TODO(eiderman): For a multi-label top k, what does accuracy mean?
+    predictions = tf.reshape(tf.nn.top_k(input_, topk)[1], [-1, 1, topk])
+    labels = tf.expand_dims(labels, [-1])
+
+    in_topk = tf.reduce_any(tf.equal(tf.cast(labels, predictions.dtype),
+                                     predictions),
+                            reduction_indices=[1, 2])
+  correct_predictions = tf.to_float(in_topk)
 
   # If individual examples are weighted, then we want to normalize by that.
   if per_example_weights is not None:
     per_example_weights = _convert_and_assert_per_example_weights_compatible(
-        input_layer,
+        input_,
         per_example_weights,
         dtype=None)
-    float_weights = tf.cast(per_example_weights, dtype)
+    float_weights = tf.to_float(per_example_weights)
     # TODO(eiderman): This should use an op that doesn't support broadcasting.
     correct_predictions *= float_weights
     num_examples = tf.reduce_sum(float_weights)
   else:
     # shape only holds ints, but we want to always return the same type
     # for num_examples to make everything compatible.
-    num_examples = tf.cast(tf.gather(tf.shape(input_layer), 0), dtype)
+    num_examples = tf.to_float(tf.gather(tf.shape(input_), 0))
   return tf.reduce_sum(correct_predictions), num_examples

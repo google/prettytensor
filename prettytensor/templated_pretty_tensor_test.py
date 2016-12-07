@@ -177,13 +177,13 @@ class TemplatedPrettyTensorTest(pretty_tensor_testing.PtTestCase):
       input_pt = prettytensor.wrap(
           tf.constant(self.input_data, dtype=tf.float32))
       self.BuildLargishGraph(input_pt)
-      normal_names = sorted([v.name for v in tf.all_variables()])
+      normal_names = sorted([v.name for v in tf.global_variables()])
 
     with tf.Graph().as_default():
       template = prettytensor.template('input')
       self.BuildLargishGraph(template).construct(input=prettytensor.wrap(
           tf.constant(self.input_data, dtype=tf.float32)))
-      template_names = sorted([v.name for v in tf.all_variables()])
+      template_names = sorted([v.name for v in tf.global_variables()])
 
     self.assertSequenceEqual(normal_names, template_names)
 

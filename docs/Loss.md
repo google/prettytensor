@@ -1,87 +1,12 @@
 <!-- This file was automatically generated. -->
 
-# PrettyTensor
+# Loss
 
-A PrettyTensor is a wrapper on a Tensor that simplifies graph building.
+Wraps a layer to provide a handle to the tensor and disallows chaining.
 
-A PrettyTensor behaves like a Tensor, but also
-supports a chainable object syntax to quickly define neural networks
-and other layered architectures in TensorFlow.
-
-    result = (pretty_tensor.wrap(input_data)
-              .flatten()
-              .fully_connected(200, activation_fn=tf.nn.relu)
-              .fully_connected(10, activation_fn=None)
-              .softmax(labels, name=softmax_name))
-
-
-PrettyTensor has 3 modes of operation that share the ability to chain
-methods.
-
-## Normal mode
-
-In the normal mode, everytime a method is called a new PrettyTensor is
-created. This allows for easy chaining and yet you can still use any
-particular object multiple times. This makes it easy to branch your network.
-
-## Sequential mode
-
-In sequential mode, an internal variable - the head - keeps track of the most
-recent output tensor, thus allowing for breaking call chains into multiple
-statements:
-
-    seq = pretty_tensor.wrap(input_data).sequential()
-    seq.flatten()
-    seq.fully_connected(200, activation_fn=tf.nn.relu)
-    seq.fully_connected(10, activation_fn=None)
-    result = seq.softmax(labels, name=softmax_name))
-
-To return to the normal mode, just use `as_layer()`.
-
-It is important to note that in sequential mode, self is always returned! This
-means that the following 2 definitions are equivalent:
-
-    def network1(input_data):
-      seq = pretty_tensor.wrap(input_data).sequential()
-      seq.flatten()
-      seq.fully_connected(200, activation_fn=(tf.nn.relu,))
-      seq.fully_connected(10, activation_fn=None)
-
-    def network2(input_data):
-      seq = pretty_tensor.wrap(input_data).sequential()
-      x = seq.flatten()
-      y = x.fully_connected(200, activation_fn=(tf.nn.relu,))
-
-      # x refers to the sequential here, whose head points at y!
-      z = x.fully_connected(10, activation_fn=None)
-
-### Branch and Join
-
-More complex networks can be built using the the first class methods of branch
-and join. `branch` creates a separate PrettyTensor object that points to the
-current head when it is called and this allows the user to define a separate
-tower that either ends in a regression target, output or rejoins the network.
-Rejoining allows the user define composite layers like inception.  `join` on
-the other hand can be used to join multiple inputs or to rejoin a composite
-layer. The default join operation is to concat on the last dimension
-(depth-concat), but custom joins such as Add are also supported.
-
-In addition to the atoms of branch and join, PrettyTensor provides a clean
-syntax called `subdivide` when the user needs to branch and rejoin for a
-composite layer. `subdivide` breaks the input into the requested number of
-towers and then automatically rejoins the towers after the block completes.
-This makes it so that the indentation matches the logical structure of the
-network.
-
-
-    seq = pretty_tensor.wrap(input_data).sequential()
-    with seq.subdivide(2) as [a, b]:
-      a.conv2d([1, 1], 64)
-      b.conv2d([1, 1], 64).conv2d([3, 3], 64)
-    seq.flatten()
-    seq.fully_connected(200, activation_fn=(tf.nn.relu,))
-    seq.fully_connected(10, activation_fn=None)
-    result = seq.softmax(labels, name=softmax_name)
+A loss can be used as a regular Tensor.  You can also call `mark_as_required`
+in order to put the loss into a collection. This is useful for auxilary heads
+and other multi-loss structures.
 
 - - -
 
@@ -1215,6 +1140,18 @@ A new sequence Pretty Tensor.
 
 - - -
 
+## <a name="mark_as_required"></a>mark_as_required()
+
+
+
+Adds this loss to the MARKED_LOSSES collection.
+
+
+
+
+
+- - -
+
 ## <a name="max_pool"></a>max_pool(kernel, stride, edges=SAME, name=None)
 
 
@@ -1809,6 +1746,18 @@ arguments are passed through.
 #### Returns:
 
 A RecurrentResult.
+
+
+
+
+- - -
+
+## <a name="sequential"></a>sequential()
+
+
+
+Creates a SequentialLayerBuilder that tracks the most recent tensor.
+
 
 
 
@@ -2619,3 +2568,16 @@ Returns a PrettyTensor that points to tensor.
 
 
 - - -
+## Properties
+
+* bookkeeper
+* defaults
+* dtype
+* g
+* graph
+* layer_parameters
+* name
+* op
+* sequence
+* shape
+* tensor

@@ -94,4 +94,4 @@ def slice_constant(data, batch_size=32, name='constant_data', global_step=None):
     else:
       offset = tf.mod(global_step, count + 1)
       return tf.slice(all_data, offset * batch_size,
-                      tf.select(tf.equal(offset, count), extra, batch_size))
+                      tf.where(tf.equal(offset, count), extra, batch_size))
