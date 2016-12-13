@@ -271,7 +271,7 @@ class TensorFlowOpTest(tf.test.TestCase):
     n1 = numpy.array([[1., 2.], [3., 4.], [5., 6.], [7., 8.]],
                      dtype=numpy.float32)
     t1 = tf.constant(n1)
-    out = self.eval_tensor(tf.split(0, 2, t1))
+    out = self.eval_tensor(tf.split(value=t1, num_or_size_splits=2, axis=0))
     expected = numpy.array([[1., 2.], [3., 4.]], dtype=numpy.float32)
     testing.assert_allclose(expected, out[0], rtol=TOLERANCE, atol=TOLERANCE)
     expected = numpy.array([[5., 6.], [7., 8.]], dtype=numpy.float32)

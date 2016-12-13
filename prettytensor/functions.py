@@ -362,7 +362,8 @@ def unzip(x, split_dim, current_length, num_splits=2, name=None):
   with tf.name_scope(name, 'unzip', [x]) as scope:
     x = tf.convert_to_tensor(x, name='x')
     # There is probably a more efficient way to do this.
-    all_splits = tf.split(split_dim, current_length, x, name=scope)
+    all_splits = tf.split(
+        value=x, num_or_size_splits=current_length, axis=split_dim, name=scope)
     splits = [[] for _ in xrange(num_splits)]
     for i in xrange(current_length):
       splits[i % num_splits].append(all_splits[i])

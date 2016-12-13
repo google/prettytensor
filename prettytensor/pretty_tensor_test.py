@@ -373,7 +373,6 @@ class PrettyTensorTest(pretty_tensor_testing.PtTestCase):
       st.conv2d(3, 2)
     self.assertEqual(2,
                      len(tf.get_collection(prettytensor.GraphKeys.UPDATE_OPS)))
-    print([n.name for n in tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES)])
     self.assertTrue(tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, '.*/beta'))
     self.assertTrue(tf.get_collection(
         tf.GraphKeys.GLOBAL_VARIABLES, '.*/gamma'))
@@ -1034,7 +1033,6 @@ class PrettyTensorTest(pretty_tensor_testing.PtTestCase):
 
     # Test reverse ops
     for op in operators:
-      print(op.__name__)
       t1 = op(2., self.input)
       t2 = op(2., self.input_layer)
       seq1 = op([2., 1.], sequence_input)

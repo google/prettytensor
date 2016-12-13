@@ -87,7 +87,7 @@ class Runner(object):
     self._last_restore = None
     if self._save_path:
       self._logdir = logdir if logdir else os.path.dirname(self._save_path)
-      self._summary_writer = tf.train.SummaryWriter(self._logdir)
+      self._summary_writer = tf.summary.FileWriter(self._logdir)
     else:
       self._logdir = logdir
       self._summary_writer = None
@@ -136,7 +136,7 @@ class Runner(object):
       self._check_inited = tf.assert_variables_initialized()
       self._var_count = len(tf.global_variables())
       if self._summary_writer:
-        self._summaries = tf.merge_all_summaries()
+        self._summaries = tf.contrib.deprecated.merge_all_summaries()
         self._summary_writer.add_graph(tf.get_default_graph())
 
   def _init_model(self, sess, allow_initialize):

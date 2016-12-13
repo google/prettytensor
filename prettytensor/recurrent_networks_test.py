@@ -27,40 +27,10 @@ import tensorflow as tf
 import prettytensor
 from prettytensor import pretty_tensor_testing
 from prettytensor import recurrent_networks
+from prettytensor import recurrent_networks_testing_utils as testing_utils
 
 
 TOLERANCE = 0.00001
-
-
-class SequenceInputMock(object):
-
-  def __init__(self, bookkeeper, input_list, label_list, node_depth):
-    self.inputs = self.for_constants(input_list)
-    self.targets = self.for_constants(label_list)
-    self.node_depth = node_depth
-    self.batch_size = input_list[0].shape[0]
-    self.requested_tensors = {}
-    self.bookkeeper = bookkeeper
-    self.num_timesteps = len(input_list)
-
-  def for_constants(self, ls):
-    return [tf.constant(x, dtype=tf.float32) for x in ls]
-
-  def state(self, state_name):
-    if state_name not in self.requested_tensors:
-      count = tf.get_variable('count_%s' % state_name,
-                              [],
-                              tf.int32,
-                              tf.zeros_initializer,
-                              trainable=False)
-      value = tf.get_variable(state_name, [self.batch_size, self.node_depth],
-                              tf.float32, tf.zeros_initializer)
-      self.requested_tensors[state_name] = (count, value)
-
-    return self.requested_tensors[state_name][1]
-
-  def save_state(self, state_name, unused_value, name='SaveState'):
-    return tf.assign_add(self.requested_tensors[state_name][0], 1, name=name)
 
 
 class RecurrentNetworksTest(pretty_tensor_testing.PtTestCase):
@@ -73,8 +43,8 @@ class RecurrentNetworksTest(pretty_tensor_testing.PtTestCase):
             [[5.], [6.], [7.], [8.]], [[9.], [10.], [11.], [12.]]
         ],
         dtype=numpy.float)
-    self.sequence = SequenceInputMock(self.bookkeeper, self.input_data,
-                                      [[0.], [0.], [0.], [1.]], 13)
+    self.sequence = testing_utils.SequenceInputMock(
+        self.bookkeeper, self.input_data, [[0.], [0.], [0.], [1.]], 13)
 
     self.input, self.output = recurrent_networks.create_sequence_pretty_tensor(
         self.sequence)
@@ -98,7 +68,8 @@ class RecurrentNetworksTest(pretty_tensor_testing.PtTestCase):
   def testSquashAndCleaveLength1(self):
     input_data = numpy.array(
         [[[1.], [2.], [3.], [4.]]], dtype=numpy.float)
-    sequence = SequenceInputMock(self.bookkeeper, input_data, [[0.]], 13)
+    sequence = testing_utils.SequenceInputMock(
+        self.bookkeeper, input_data, [[0.]], 13)
 
     inp, _ = recurrent_networks.create_sequence_pretty_tensor(sequence)
     squashed = inp.squash_sequence()

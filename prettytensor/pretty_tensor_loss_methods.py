@@ -412,10 +412,10 @@ def softmax_classifier_with_sampled_loss(
 
       def _loss(input_, labels, name=None):
         return tf.nn.sampled_softmax_loss(
-            full.layer_parameters['weights'],
-            full.layer_parameters['bias'],
-            input_,
-            labels,
+            weights=full.layer_parameters['weights'],
+            biases=full.layer_parameters['bias'],
+            labels=labels,
+            inputs=input_,
             num_sampled=num_sampled,
             num_classes=num_classes,
             num_true=num_true,

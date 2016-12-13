@@ -451,7 +451,8 @@ def cleave_sequence(input_layer, unroll=None):
   elif unroll == 1:
     splits = [input_layer.tensor]
   else:
-    splits = tf.split(0, unroll, input_layer.tensor)
+    splits = tf.split(
+        value=input_layer.tensor, num_or_size_splits=unroll, axis=0)
   result = input_layer.with_sequence(splits)
 
   # This is an abuse of the defaults system, but it is safe because we are only

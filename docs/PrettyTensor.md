@@ -442,7 +442,7 @@ A new PrettyTensor.
 
 - - -
 
-## <a name="conv2d"></a>conv2d(kernel, depth, activation_fn=None, stride=(1, 1), l2loss=None, weights=None, bias=<function zeros_initializer at 0x25c3a2a8>, edges=SAME, batch_normalize=False, phase=train, parameter_modifier=<function identity at 0x2654c8c0>, name=None)
+## <a name="conv2d"></a>conv2d(kernel, depth, activation_fn=None, stride=(1, 1), l2loss=None, weights=None, bias=<function zeros_initializer at 0x25571758>, edges=SAME, batch_normalize=False, phase=train, parameter_modifier=<function identity at 0x25cfe050>, name=None)
 
 
 
@@ -526,7 +526,7 @@ A loss.
 
 - - -
 
-## <a name="depthwise_conv2d"></a>depthwise_conv2d(kernel, channel_multiplier, activation_fn=None, stride=None, l2loss=None, weights=None, bias=<function zeros_initializer at 0x25c3a2a8>, edges=SAME, batch_normalize=False, phase=train, parameter_modifier=<function identity at 0x2654c8c0>, name=None)
+## <a name="depthwise_conv2d"></a>depthwise_conv2d(kernel, channel_multiplier, activation_fn=None, stride=None, l2loss=None, weights=None, bias=<function zeros_initializer at 0x25571758>, edges=SAME, batch_normalize=False, phase=train, parameter_modifier=<function identity at 0x25cfe050>, name=None)
 
 
 
@@ -586,7 +586,7 @@ Handle to the generated layer.
 
 - - -
 
-## <a name="diagonal_matrix_mul"></a>diagonal_matrix_mul(weights=None, l2loss=None, phase=train, parameter_modifier=<function identity at 0x2654c8c0>)
+## <a name="diagonal_matrix_mul"></a>diagonal_matrix_mul(weights=None, l2loss=None, phase=train, parameter_modifier=<function identity at 0x25cfe050>)
 
 
 
@@ -630,7 +630,7 @@ Aplies dropout if this is in the train phase.
 
 - - -
 
-## <a name="embedding_lookup"></a>embedding_lookup(embedding_count, embedding_shape, weights=None, phase=train, parameter_modifier=<function identity at 0x2654c8c0>, name=None)
+## <a name="embedding_lookup"></a>embedding_lookup(embedding_count, embedding_shape, weights=None, phase=train, parameter_modifier=<function identity at 0x25cfe050>, name=None)
 
 
 
@@ -904,7 +904,7 @@ A LayerWrapper with the flattened tensor.
 
 - - -
 
-## <a name="fully_connected"></a>fully_connected(size, activation_fn=None, l2loss=None, weights=None, bias=<function zeros_initializer at 0x25c3a2a8>, transpose_weights=False, phase=train, parameter_modifier=<function identity at 0x2654c8c0>, name=None)
+## <a name="fully_connected"></a>fully_connected(size, activation_fn=None, l2loss=None, weights=None, bias=<function zeros_initializer at 0x25571758>, transpose_weights=False, phase=train, parameter_modifier=<function identity at 0x25cfe050>, name=None)
 
 
 
@@ -953,7 +953,7 @@ A Pretty Tensor handle to the layer.
 
 - - -
 
-## <a name="gru_cell"></a>gru_cell(state, num_units, bias=<function zeros_initializer at 0x25c3a2a8>, weights=None, phase=train, parameter_modifier=<function identity at 0x2654c8c0>)
+## <a name="gru_cell"></a>gru_cell(state, num_units, bias=<function zeros_initializer at 0x25571758>, weights=None, phase=train, parameter_modifier=<function identity at 0x25cfe050>)
 
 
 
@@ -1159,7 +1159,7 @@ A `Tensor`. Has the same type as `x`.
 
 - - -
 
-## <a name="lstm_cell"></a>lstm_cell(states, num_units, bias=<function zeros_initializer at 0x25c3a2a8>, peephole=True, weights=None, phase=train, parameter_modifier=<function identity at 0x2654c8c0>)
+## <a name="lstm_cell"></a>lstm_cell(states, num_units, bias=<function zeros_initializer at 0x25571758>, peephole=True, weights=None, phase=train, parameter_modifier=<function identity at 0x25cfe050>)
 
 
 
@@ -1394,7 +1394,7 @@ The reduced tensor.
 
 - - -
 
-## <a name="reduce_join"></a>reduce_join(reduction_indices, keep_dims=None, separator=None, name=None)
+## <a name="reduce_join"></a>reduce_join(axis=None, keep_dims=False, separator=, name=None, reduction_indices=None)
 
 
 
@@ -1404,7 +1404,7 @@ Computes the string join across dimensions in the given string Tensor of shape
 `[d_0, d_1, ..., d_n-1]`.  Returns a new Tensor created by joining the input
 strings with the given separator (default: empty string).  Negative indices are
 counted backwards from the end, with `-1` being equivalent to `n - 1`.  Passing
-an empty `reduction_indices` joins all strings in linear index order and outputs
+an empty `axis` joins all strings in linear index order and outputs
 a scalar string.
 
 
@@ -1427,9 +1427,9 @@ tf.reduce_join(a, []) ==> ["abcd"]
 #### Args:
 
 
-* reduction_indices: A `Tensor` of type `int32`.
+* axis: A `Tensor` of type `int32`.
  The dimensions to reduce over. Dimensions are reduced in the
- order specified. Omitting `reduction_indices` is equivalent to passing
+ order specified. Omitting `axis` is equivalent to passing
  `[n-1, n-2, ..., 0]`. Negative indices from `-n` to `-1` are supported.
 * keep_dims: An optional `bool`. Defaults to `False`.
  If `True`, retain reduced dimensions with length `1`.
@@ -1938,7 +1938,7 @@ Computes the softmax.
 
 - - -
 
-## <a name="softmax_classifier"></a>softmax_classifier(num_classes, labels=None, loss_weight=None, per_example_weights=None, weights=None, bias=<function zeros_initializer at 0x25c3a2a8>, parameter_modifier=<function identity at 0x2654c8c0>, name=None)
+## <a name="softmax_classifier"></a>softmax_classifier(num_classes, labels=None, loss_weight=None, per_example_weights=None, weights=None, bias=<function zeros_initializer at 0x25571758>, parameter_modifier=<function identity at 0x25cfe050>, name=None)
 
 
 
@@ -1975,7 +1975,7 @@ A named tuple holding:
 
 - - -
 
-## <a name="softmax_classifier_with_sampled_loss"></a>softmax_classifier_with_sampled_loss(num_classes, labels, num_sampled, num_true=None, sampled_values=None, remove_accidental_hits=True, loss_weight=None, per_example_weights=None, weights=None, bias=<function zeros_initializer at 0x25c3a2a8>, parameter_modifier=<function identity at 0x2654c8c0>, name=softmax_classifier)
+## <a name="softmax_classifier_with_sampled_loss"></a>softmax_classifier_with_sampled_loss(num_classes, labels, num_sampled, num_true=None, sampled_values=None, remove_accidental_hits=True, loss_weight=None, per_example_weights=None, weights=None, bias=<function zeros_initializer at 0x25571758>, parameter_modifier=<function identity at 0x25cfe050>, name=softmax_classifier)
 
 
 

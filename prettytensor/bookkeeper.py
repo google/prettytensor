@@ -237,10 +237,9 @@ class Bookkeeper(object):
         tag = x.op.name
       elif _NAME_SCOPE_SEP not in tag:
         tag = self.g.unique_name(tag)
-      summary = (tf.scalar_summary(tag,
-                                   x,
-                                   name='%s_summary' % tag,
-                                   collections=self.summary_collections))
+      summary = (tf.contrib.deprecated.scalar_summary(
+          tag, x, name='%s_summary' % tag,
+          collections=self.summary_collections))
       self.check_summary(tag)
       return summary
 
@@ -253,9 +252,8 @@ class Bookkeeper(object):
         tag = tensor.op.name
       elif _NAME_SCOPE_SEP not in tag:
         tag = self.g.unique_name(tag)
-      summary = tf.histogram_summary(tag,
-                                     tensor,
-                                     collections=self.summary_collections)
+      summary = tf.contrib.deprecated.histogram_summary(
+          tag, tensor, collections=self.summary_collections)
       self.check_summary(tag)
       return summary
 
@@ -637,7 +635,7 @@ def apply_optimizer(optimizer,
         cg = tf.SparseTensor(
             tf.clip_by_norm(g.values, clip_gradients_by_norm),
             g.indices,
-            g.shape)
+            g.dense_shape)
       elif isinstance(g, tf.IndexedSlices):
         cg = tf.IndexedSlices(
             tf.clip_by_norm(g.values, clip_gradients_by_norm),

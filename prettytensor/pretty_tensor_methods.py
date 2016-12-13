@@ -586,7 +586,8 @@ def split(input_layer, split_dim=0, num_splits=2):
   """
   shape = input_layer.shape
   _check_split_dims(num_splits, split_dim, shape)
-  splits = tf.split(split_dim, num_splits, input_layer)
+  splits = tf.split(
+      value=input_layer, num_or_size_splits=num_splits, axis=split_dim)
   return input_layer.with_sequence(splits)
 
 
