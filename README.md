@@ -31,6 +31,8 @@ The easiest installation is just to use pip:
 2. `pip install prettytensor`
 
 
+**Note:** Head is tested against the TensorFlow nightly builds and pip is tested against TensorFlow release.
+
 ## Quick start
 
 ### Imports
@@ -54,7 +56,7 @@ The easiest installation is just to use pip:
 
     optimizer = tf.train.GradientDescentOptimizer(0.1)  # learning rate
     train_op = pt.apply_optimizer(optimizer, losses=[loss])
-    
+
     init_op = tf.initialize_all_variables()
 
     with tf.Session() as sess:
