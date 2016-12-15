@@ -136,7 +136,7 @@ class Runner(object):
       self._check_inited = tf.assert_variables_initialized()
       self._var_count = len(tf.global_variables())
       if self._summary_writer:
-        self._summaries = tf.contrib.deprecated.merge_all_summaries()
+        self._summaries = tf.summary.merge_all()
         self._summary_writer.add_graph(tf.get_default_graph())
 
   def _init_model(self, sess, allow_initialize):

@@ -442,7 +442,7 @@ A new PrettyTensor.
 
 - - -
 
-## <a name="conv2d"></a>conv2d(kernel, depth, activation_fn=None, stride=(1, 1), l2loss=None, weights=None, bias=<function _initializer at 0x41c8938>, edges=SAME, batch_normalize=False, phase=train, parameter_modifier=<function identity at 0x4266c08>, name=None)
+## <a name="conv2d"></a>conv2d(kernel, depth, activation_fn=None, stride=(1, 1), l2loss=None, weights=None, bias=<function _initializer at 0x4c15aa0>, edges=SAME, batch_normalize=False, phase=train, parameter_modifier=<function identity at 0x4cb3c08>, name=None)
 
 
 
@@ -526,7 +526,7 @@ A loss.
 
 - - -
 
-## <a name="depthwise_conv2d"></a>depthwise_conv2d(kernel, channel_multiplier, activation_fn=None, stride=None, l2loss=None, weights=None, bias=<function _initializer at 0x41c8aa0>, edges=SAME, batch_normalize=False, phase=train, parameter_modifier=<function identity at 0x4266c08>, name=None)
+## <a name="depthwise_conv2d"></a>depthwise_conv2d(kernel, channel_multiplier, activation_fn=None, stride=None, l2loss=None, weights=None, bias=<function _initializer at 0x4c15c08>, edges=SAME, batch_normalize=False, phase=train, parameter_modifier=<function identity at 0x4cb3c08>, name=None)
 
 
 
@@ -586,7 +586,7 @@ Handle to the generated layer.
 
 - - -
 
-## <a name="diagonal_matrix_mul"></a>diagonal_matrix_mul(weights=None, l2loss=None, phase=train, parameter_modifier=<function identity at 0x4266c08>)
+## <a name="diagonal_matrix_mul"></a>diagonal_matrix_mul(weights=None, l2loss=None, phase=train, parameter_modifier=<function identity at 0x4cb3c08>)
 
 
 
@@ -630,7 +630,7 @@ Aplies dropout if this is in the train phase.
 
 - - -
 
-## <a name="embedding_lookup"></a>embedding_lookup(embedding_count, embedding_shape, weights=None, phase=train, parameter_modifier=<function identity at 0x4266c08>, name=None)
+## <a name="embedding_lookup"></a>embedding_lookup(embedding_count, embedding_shape, weights=None, phase=train, parameter_modifier=<function identity at 0x4cb3c08>, name=None)
 
 
 
@@ -904,7 +904,7 @@ A LayerWrapper with the flattened tensor.
 
 - - -
 
-## <a name="fully_connected"></a>fully_connected(size, activation_fn=None, l2loss=None, weights=None, bias=<function _initializer at 0x41d0ed8>, transpose_weights=False, phase=train, parameter_modifier=<function identity at 0x4266c08>, name=None)
+## <a name="fully_connected"></a>fully_connected(size, activation_fn=None, l2loss=None, weights=None, bias=<function _initializer at 0x4c270c8>, transpose_weights=False, phase=train, parameter_modifier=<function identity at 0x4cb3c08>, name=None)
 
 
 
@@ -953,7 +953,7 @@ A Pretty Tensor handle to the layer.
 
 - - -
 
-## <a name="gru_cell"></a>gru_cell(state, num_units, bias=<function _initializer at 0x41e4758>, weights=None, phase=train, parameter_modifier=<function identity at 0x4266c08>)
+## <a name="gru_cell"></a>gru_cell(state, num_units, bias=<function _initializer at 0x4c318c0>, weights=None, phase=train, parameter_modifier=<function identity at 0x4cb3c08>)
 
 
 
@@ -1159,7 +1159,7 @@ A `Tensor`. Has the same type as `x`.
 
 - - -
 
-## <a name="lstm_cell"></a>lstm_cell(states, num_units, bias=<function _initializer at 0x41e4398>, peephole=True, weights=None, phase=train, parameter_modifier=<function identity at 0x4266c08>)
+## <a name="lstm_cell"></a>lstm_cell(states, num_units, bias=<function _initializer at 0x4c31500>, peephole=True, weights=None, phase=train, parameter_modifier=<function identity at 0x4cb3c08>)
 
 
 
@@ -1942,7 +1942,7 @@ Computes the softmax.
 
 - - -
 
-## <a name="softmax_classifier"></a>softmax_classifier(num_classes, labels=None, loss_weight=None, per_example_weights=None, weights=None, bias=<function _initializer at 0x41cdde8>, parameter_modifier=<function identity at 0x4266c08>, name=None)
+## <a name="softmax_classifier"></a>softmax_classifier(num_classes, labels=None, loss_weight=None, per_example_weights=None, weights=None, bias=<function _initializer at 0x4c1af50>, parameter_modifier=<function identity at 0x4cb3c08>, name=None)
 
 
 
@@ -1979,7 +1979,7 @@ A named tuple holding:
 
 - - -
 
-## <a name="softmax_classifier_with_sampled_loss"></a>softmax_classifier_with_sampled_loss(num_classes, labels, num_sampled, num_true=None, sampled_values=None, remove_accidental_hits=True, loss_weight=None, per_example_weights=None, weights=None, bias=<function _initializer at 0x41cdc80>, parameter_modifier=<function identity at 0x4266c08>, name=softmax_classifier)
+## <a name="softmax_classifier_with_sampled_loss"></a>softmax_classifier_with_sampled_loss(num_classes, labels, num_sampled, num_true=None, sampled_values=None, remove_accidental_hits=True, loss_weight=None, per_example_weights=None, weights=None, bias=<function _initializer at 0x4c1ade8>, parameter_modifier=<function identity at 0x4cb3c08>, name=softmax_classifier)
 
 
 

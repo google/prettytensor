@@ -49,11 +49,11 @@ The averaged variable.
 
 - - -
 
-## <a name="add_histogram_summary"></a>add_histogram_summary(tensor, tag=None)
+## <a name="add_histogram_summary"></a>add_histogram_summary(x, tag=None)
 
 
 
-Add a summary operation to visualize any tensor.
+Add a summary operation to visualize the histogram of x's values.
 
 
 
@@ -94,13 +94,6 @@ Append a loss to the total loss for the network.
 
 Adds a scalar summary for x.
 
-
-
-
-
-- - -
-
-## <a name="check_summary"></a>check_summary(tag)
 
 
 
