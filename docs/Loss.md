@@ -367,7 +367,7 @@ A new PrettyTensor.
 
 - - -
 
-## <a name="conv2d"></a>conv2d(kernel, depth, activation_fn=None, stride=(1, 1), l2loss=None, weights=None, bias=<function zeros_initializer at 0x25d6e2a8>, edges=SAME, batch_normalize=False, phase=train, parameter_modifier=<function identity at 0x266eb8c0>, name=None)
+## <a name="conv2d"></a>conv2d(kernel, depth, activation_fn=None, stride=(1, 1), l2loss=None, weights=None, bias=<function _initializer at 0x4c15aa0>, edges=SAME, batch_normalize=False, phase=train, parameter_modifier=<function identity at 0x4cb3c08>, name=None)
 
 
 
@@ -451,7 +451,7 @@ A loss.
 
 - - -
 
-## <a name="depthwise_conv2d"></a>depthwise_conv2d(kernel, channel_multiplier, activation_fn=None, stride=None, l2loss=None, weights=None, bias=<function zeros_initializer at 0x25d6e2a8>, edges=SAME, batch_normalize=False, phase=train, parameter_modifier=<function identity at 0x266eb8c0>, name=None)
+## <a name="depthwise_conv2d"></a>depthwise_conv2d(kernel, channel_multiplier, activation_fn=None, stride=None, l2loss=None, weights=None, bias=<function _initializer at 0x4c15c08>, edges=SAME, batch_normalize=False, phase=train, parameter_modifier=<function identity at 0x4cb3c08>, name=None)
 
 
 
@@ -511,7 +511,7 @@ Handle to the generated layer.
 
 - - -
 
-## <a name="diagonal_matrix_mul"></a>diagonal_matrix_mul(weights=None, l2loss=None, phase=train, parameter_modifier=<function identity at 0x266eb8c0>)
+## <a name="diagonal_matrix_mul"></a>diagonal_matrix_mul(weights=None, l2loss=None, phase=train, parameter_modifier=<function identity at 0x4cb3c08>)
 
 
 
@@ -555,8 +555,7 @@ Aplies dropout if this is in the train phase.
 
 - - -
 
-## <a name="embedding_lookup"></a>embedding_lookup(embedding_count, embedding_shape, weights=None, phase=train, parameter_modifier=<function identity at 0x266eb8c0>, name=None)
-
+## <a name="embedding_lookup"></a>embedding_lookup(embedding_count, embedding_shape, weights=None, phase=train, parameter_modifier=<function identity at 0x4cb3c08>, name=None)
 
 
 Looks up values in a learned embedding lookup.
@@ -829,56 +828,8 @@ A LayerWrapper with the flattened tensor.
 
 - - -
 
-## <a name="fully_connected"></a>fully_connected(size, activation_fn=None, l2loss=None, weights=None, bias=<function zeros_initializer at 0x25d6e2a8>, transpose_weights=False, phase=train, parameter_modifier=<function identity at 0x266eb8c0>, name=None)
-
-
-
-Adds the parameters for a fully connected layer and returns a tensor.
-
-The current PrettyTensor must have rank 2.
-
-#### Args:
-
-
-* size: The number of neurons
-* activation_fn: A tuple of (activation_function, extra_parameters). Any
- function that takes a tensor as its first argument can be used. More
- common functions will have summaries added (e.g. relu).
-* l2loss: Set to a value greater than 0 to use L2 regularization to decay
- the weights.
-* weights: An initializer for weights or a Tensor. If not specified,
- uses He's initialization.
-* bias: An initializer for the bias or a Tensor. No bias if set to None.
-* transpose_weights: Flag indicating if weights should be transposed;
- this is useful for loading models with a different shape.
-* phase: The phase of graph construction. See `pt.Phase`.
-* parameter_modifier: A function to modify parameters that is applied after
- creation and before use.
-* name: The name for this operation is also used to create/find the
- parameter variables.
-
-#### Returns:
-
-A Pretty Tensor handle to the layer.
-
-
-#### Raises:
-
-
-* ValueError: if the Pretty Tensor is not rank 2 or the number of input
- nodes (second dim) is not known.
-
-
-- - -
-
-## <a name="get_shape"></a>get_shape()
-
-
-
-
-- - -
-
-## <a name="gru_cell"></a>gru_cell(state, num_units, bias=<function zeros_initializer at 0x25d6e2a8>, weights=None, phase=train, parameter_modifier=<function identity at 0x266eb8c0>)
+## <a name="fully_connected"></a>fully_connected(size, activation_fn=None, l2loss=None, weights=None, bias=<function _initializer at 0x4c270c8>, transpose_weights=False, phase=train, parameter_modifier=<function identity at 0x4cb3c08>, name=None)
+## <a name="gru_cell"></a>gru_cell(state, num_units, bias=<function _initializer at 0x4c318c0>, weights=None, phase=train, parameter_modifier=<function identity at 0x4cb3c08>)
 
 
 
@@ -1084,7 +1035,7 @@ A `Tensor`. Has the same type as `x`.
 
 - - -
 
-## <a name="lstm_cell"></a>lstm_cell(states, num_units, bias=<function zeros_initializer at 0x25d6e2a8>, peephole=True, weights=None, phase=train, parameter_modifier=<function identity at 0x266eb8c0>)
+## <a name="lstm_cell"></a>lstm_cell(states, num_units, bias=<function _initializer at 0x4c31500>, peephole=True, weights=None, phase=train, parameter_modifier=<function identity at 0x4cb3c08>)
 
 
 
@@ -1887,7 +1838,7 @@ Computes the softmax.
 
 - - -
 
-## <a name="softmax_classifier"></a>softmax_classifier(num_classes, labels=None, loss_weight=None, per_example_weights=None, weights=None, bias=<function zeros_initializer at 0x25d6e2a8>, parameter_modifier=<function identity at 0x266eb8c0>, name=None)
+## <a name="softmax_classifier"></a>softmax_classifier(num_classes, labels=None, loss_weight=None, per_example_weights=None, weights=None, bias=<function _initializer at 0x4c1af50>, parameter_modifier=<function identity at 0x4cb3c08>, name=None)
 
 
 
@@ -1924,7 +1875,7 @@ A named tuple holding:
 
 - - -
 
-## <a name="softmax_classifier_with_sampled_loss"></a>softmax_classifier_with_sampled_loss(num_classes, labels, num_sampled, num_true=None, sampled_values=None, remove_accidental_hits=True, loss_weight=None, per_example_weights=None, weights=None, bias=<function zeros_initializer at 0x25d6e2a8>, parameter_modifier=<function identity at 0x266eb8c0>, name=softmax_classifier)
+## <a name="softmax_classifier_with_sampled_loss"></a>softmax_classifier_with_sampled_loss(num_classes, labels, num_sampled, num_true=None, sampled_values=None, remove_accidental_hits=True, loss_weight=None, per_example_weights=None, weights=None, bias=<function _initializer at 0x4c1ade8>, parameter_modifier=<function identity at 0x4cb3c08>, name=softmax_classifier)
 
 
 

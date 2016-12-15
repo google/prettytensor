@@ -50,6 +50,21 @@ _NAME_SCOPE_SEP = '/'
 BOOKKEEPER_FACTORY = None
 
 
+def _strip_colon(name):
+  if ':' in name:
+    return name[:name.rfind(':')]
+  else:
+    return name
+
+
+def _tag_for(name):
+  index_of_end = name.rfind(_NAME_SCOPE_SEP)
+  if index_of_end == -1:
+    return _strip_colon(name)
+  else:
+    return _strip_colon(name[index_of_end:])
+
+
 def for_default_graph(*args, **kwargs):
   """Creates a bookkeeper for the default graph.
 
@@ -223,40 +238,24 @@ class Bookkeeper(object):
       except KeyError:
         self._global_step = tf.Variable(0, name='global_step', trainable=False)
 
-  def check_summary(self, tag):
-    if tag in self._summary_tags:
-      raise ValueError('Tag clash with summary: %s' % tag)
-    self._summary_tags.add(tag)
-
   def add_scalar_summary(self, x, tag=None):
     """Adds a scalar summary for x."""
     if not self.summary_collections:
       return
     with self.g.as_default():
-      if tag is None:
-        tag = x.op.name
-      elif _NAME_SCOPE_SEP not in tag:
-        tag = self.g.unique_name(tag)
-      summary = (tf.scalar_summary(tag,
-                                   x,
-                                   name='%s_summary' % tag,
-                                   collections=self.summary_collections))
-      self.check_summary(tag)
+      tag = tag or _tag_for(x.name)
+      summary = (tf.summary.scalar(
+          tag, x, collections=self.summary_collections))
       return summary
 
-  def add_histogram_summary(self, tensor, tag=None):
-    """Add a summary operation to visualize any tensor."""
+  def add_histogram_summary(self, x, tag=None):
+    """Add a summary operation to visualize the histogram of x's values."""
     if not self.summary_collections:
       return
     with self.g.as_default():
-      if tag is None:
-        tag = tensor.op.name
-      elif _NAME_SCOPE_SEP not in tag:
-        tag = self.g.unique_name(tag)
-      summary = tf.histogram_summary(tag,
-                                     tensor,
-                                     collections=self.summary_collections)
-      self.check_summary(tag)
+      tag = tag or _tag_for(x.name)
+      summary = tf.summary.histogram(
+          tag, x, collections=self.summary_collections)
       return summary
 
   def exponential_moving_average(self,
