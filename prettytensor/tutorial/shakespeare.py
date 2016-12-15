@@ -157,13 +157,13 @@ def main(_=None):
   # We need a dense output to calculate loss and accuracy.
   # sparse_to_dense does a lookup using the indices from the first Tensor.
   # Because we are filling in a 2D array, the indices need to be 2 dimensional.
-  t = tf.concat(1,
-                [
-                    tf.constant(
-                        numpy.arange(merged_size).reshape((merged_size, 1)),
-                        dtype=tf.int32),
-                    data_utils.reshape_data(output_placeholder)
-                ])
+  t = tf.concat_v2(
+      [
+          tf.constant(
+              numpy.arange(merged_size).reshape((merged_size, 1)),
+              dtype=tf.int32), data_utils.reshape_data(output_placeholder)
+      ],
+      1)
 
   labels = tf.sparse_to_dense(t, [merged_size, CHARS], 1.0, 0.0)
 

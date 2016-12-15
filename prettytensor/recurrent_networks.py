@@ -418,7 +418,7 @@ def squash_sequence(input_layer):
   elif timesteps == 1:
     result = input_layer.sequence[0]
   else:
-    result = tf.concat(0, input_layer.sequence)
+    result = tf.concat_v2(input_layer.sequence, 0)
   return input_layer.with_tensor(result).with_defaults(unroll=timesteps)
 
 

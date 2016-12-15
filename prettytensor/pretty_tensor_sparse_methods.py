@@ -53,9 +53,9 @@ def to_dense_one_hot(labels, class_count):
     count = tf.cast(count, dtype)
     batch = tf.cast(batch, dtype)
 
-  result = tf.sparse_to_dense(tf.concat(1, [count, labels]),
-                              tf.concat(0, [tf.expand_dims(batch, 0),
-                                            tf.expand_dims(class_tensor, 0)]),
-                              1.0, 0.0)
+  result = tf.sparse_to_dense(
+      tf.concat_v2([count, labels], 1),
+      tf.concat_v2([tf.expand_dims(batch, 0), tf.expand_dims(class_tensor, 0)],
+                   0), 1.0, 0.0)
   result.set_shape([labels.get_shape().dims[0], class_count])
   return result

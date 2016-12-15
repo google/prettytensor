@@ -367,7 +367,7 @@ def unzip(x, split_dim, current_length, num_splits=2, name=None):
     splits = [[] for _ in xrange(num_splits)]
     for i in xrange(current_length):
       splits[i % num_splits].append(all_splits[i])
-    return [tf.concat(split_dim, s) for s in splits]
+    return [tf.concat_v2(s, split_dim) for s in splits]
 
 
 def _last_index(x, default_dim):

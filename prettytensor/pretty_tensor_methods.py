@@ -193,7 +193,7 @@ def reshape(input_layer, shape_spec):
   if len(reshape_tensor) == 1:
     reshape_tensor = reshape_tensor[0]
   else:
-    reshape_tensor = tf.concat(0, reshape_tensor)
+    reshape_tensor = tf.concat_v2(reshape_tensor, 0)
   result = tf.reshape(input_layer, reshape_tensor)
   result.set_shape(new_shape)
 
@@ -519,7 +519,7 @@ def concat(input_layer, concat_dim, other_tensors=None):
   if not all_tensors:
     return prettytensor.wrap_sequence([])
   else:
-    return tf.concat(concat_dim, all_tensors)
+    return tf.concat_v2(all_tensors, concat_dim)
 
 
 @prettytensor.Register(method_name='slice')

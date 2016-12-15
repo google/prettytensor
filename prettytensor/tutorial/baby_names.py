@@ -107,12 +107,13 @@ def main(_=None):
   # Because we are filling in a 2D array, the indices need to be 2 dimensional.
   # Since we want to assign 1 value for each row, the first dimension can just
   # be a sequence.
-  t = tf.concat(1,
-                [
-                    tf.constant(
-                        numpy.arange(BATCH_SIZE).reshape((BATCH_SIZE, 1)),
-                        dtype=tf.int32), length_placeholder
-                ])
+  t = tf.concat_v2(
+      [
+          tf.constant(
+              numpy.arange(BATCH_SIZE).reshape((BATCH_SIZE, 1)),
+              dtype=tf.int32), length_placeholder
+      ],
+      1)
 
   # Squeeze removes dimensions that are equal to 1.  per_example_weights must
   # end up as 1 dimensional.
