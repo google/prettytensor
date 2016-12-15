@@ -300,7 +300,7 @@ class fully_connected(prettytensor.VarStoreMethod):
                activation_fn=None,
                l2loss=None,
                weights=None,
-               bias=tf.zeros_initializer,
+               bias=tf.zeros_initializer(),
                transpose_weights=False,
                phase=prettytensor.Phase.train,
                parameter_modifier=parameters.identity,

@@ -367,7 +367,7 @@ A new PrettyTensor.
 
 - - -
 
-## <a name="conv2d"></a>conv2d(kernel, depth, activation_fn=None, stride=(1, 1), l2loss=None, weights=None, bias=<function zeros_initializer at 0x25571758>, edges=SAME, batch_normalize=False, phase=train, parameter_modifier=<function identity at 0x25cfe050>, name=None)
+## <a name="conv2d"></a>conv2d(kernel, depth, activation_fn=None, stride=(1, 1), l2loss=None, weights=None, bias=<function _initializer at 0x41c8938>, edges=SAME, batch_normalize=False, phase=train, parameter_modifier=<function identity at 0x4266c08>, name=None)
 
 
 
@@ -451,7 +451,7 @@ A loss.
 
 - - -
 
-## <a name="depthwise_conv2d"></a>depthwise_conv2d(kernel, channel_multiplier, activation_fn=None, stride=None, l2loss=None, weights=None, bias=<function zeros_initializer at 0x25571758>, edges=SAME, batch_normalize=False, phase=train, parameter_modifier=<function identity at 0x25cfe050>, name=None)
+## <a name="depthwise_conv2d"></a>depthwise_conv2d(kernel, channel_multiplier, activation_fn=None, stride=None, l2loss=None, weights=None, bias=<function _initializer at 0x41c8aa0>, edges=SAME, batch_normalize=False, phase=train, parameter_modifier=<function identity at 0x4266c08>, name=None)
 
 
 
@@ -511,7 +511,7 @@ Handle to the generated layer.
 
 - - -
 
-## <a name="diagonal_matrix_mul"></a>diagonal_matrix_mul(weights=None, l2loss=None, phase=train, parameter_modifier=<function identity at 0x25cfe050>)
+## <a name="diagonal_matrix_mul"></a>diagonal_matrix_mul(weights=None, l2loss=None, phase=train, parameter_modifier=<function identity at 0x4266c08>)
 
 
 
@@ -555,7 +555,7 @@ Aplies dropout if this is in the train phase.
 
 - - -
 
-## <a name="embedding_lookup"></a>embedding_lookup(embedding_count, embedding_shape, weights=None, phase=train, parameter_modifier=<function identity at 0x25cfe050>, name=None)
+## <a name="embedding_lookup"></a>embedding_lookup(embedding_count, embedding_shape, weights=None, phase=train, parameter_modifier=<function identity at 0x4266c08>, name=None)
 
 
 
@@ -829,7 +829,7 @@ A LayerWrapper with the flattened tensor.
 
 - - -
 
-## <a name="fully_connected"></a>fully_connected(size, activation_fn=None, l2loss=None, weights=None, bias=<function zeros_initializer at 0x25571758>, transpose_weights=False, phase=train, parameter_modifier=<function identity at 0x25cfe050>, name=None)
+## <a name="fully_connected"></a>fully_connected(size, activation_fn=None, l2loss=None, weights=None, bias=<function _initializer at 0x41d0ed8>, transpose_weights=False, phase=train, parameter_modifier=<function identity at 0x4266c08>, name=None)
 
 
 
@@ -878,7 +878,7 @@ A Pretty Tensor handle to the layer.
 
 - - -
 
-## <a name="gru_cell"></a>gru_cell(state, num_units, bias=<function zeros_initializer at 0x25571758>, weights=None, phase=train, parameter_modifier=<function identity at 0x25cfe050>)
+## <a name="gru_cell"></a>gru_cell(state, num_units, bias=<function _initializer at 0x41e4758>, weights=None, phase=train, parameter_modifier=<function identity at 0x4266c08>)
 
 
 
@@ -1084,7 +1084,7 @@ A `Tensor`. Has the same type as `x`.
 
 - - -
 
-## <a name="lstm_cell"></a>lstm_cell(states, num_units, bias=<function zeros_initializer at 0x25571758>, peephole=True, weights=None, phase=train, parameter_modifier=<function identity at 0x25cfe050>)
+## <a name="lstm_cell"></a>lstm_cell(states, num_units, bias=<function _initializer at 0x41e4398>, peephole=True, weights=None, phase=train, parameter_modifier=<function identity at 0x4266c08>)
 
 
 
@@ -1191,11 +1191,15 @@ Handle to this layer.
 
 - - -
 
-## <a name="pack"></a>pack(axis=0, name=pack)
+## <a name="pack"></a>pack()
 
 
 
-Packs a list of rank-`R` tensors into one rank-`(R+1)` tensor.
+Packs a list of rank-`R` tensors into one rank-`(R+1)` tensor. (deprecated)
+
+THIS FUNCTION IS DEPRECATED. It will be removed after 2016-12-14.
+Instructions for updating:
+This op will be removed after the deprecation date. Please switch to tf.stack().
 
 Packs the list of tensors in `values` into a tensor with rank one higher than
 each tensor in `values`, by packing them along the `axis` dimension.
@@ -1217,7 +1221,7 @@ pack([x, y, z], axis=1) => [[1, 2, 3], [4, 5, 6]]
 
 This is the opposite of unpack.  The numpy equivalent is
 
-    tf.pack([x, y, z]) = np.asarray([x, y, z])
+tf.pack([x, y, z]) = np.asarray([x, y, z])
 
 #### Args:
 
@@ -1887,7 +1891,7 @@ Computes the softmax.
 
 - - -
 
-## <a name="softmax_classifier"></a>softmax_classifier(num_classes, labels=None, loss_weight=None, per_example_weights=None, weights=None, bias=<function zeros_initializer at 0x25571758>, parameter_modifier=<function identity at 0x25cfe050>, name=None)
+## <a name="softmax_classifier"></a>softmax_classifier(num_classes, labels=None, loss_weight=None, per_example_weights=None, weights=None, bias=<function _initializer at 0x41cdde8>, parameter_modifier=<function identity at 0x4266c08>, name=None)
 
 
 
@@ -1924,7 +1928,7 @@ A named tuple holding:
 
 - - -
 
-## <a name="softmax_classifier_with_sampled_loss"></a>softmax_classifier_with_sampled_loss(num_classes, labels, num_sampled, num_true=None, sampled_values=None, remove_accidental_hits=True, loss_weight=None, per_example_weights=None, weights=None, bias=<function zeros_initializer at 0x25571758>, parameter_modifier=<function identity at 0x25cfe050>, name=softmax_classifier)
+## <a name="softmax_classifier_with_sampled_loss"></a>softmax_classifier_with_sampled_loss(num_classes, labels, num_sampled, num_true=None, sampled_values=None, remove_accidental_hits=True, loss_weight=None, per_example_weights=None, weights=None, bias=<function _initializer at 0x41cdc80>, parameter_modifier=<function identity at 0x4266c08>, name=softmax_classifier)
 
 
 
@@ -2374,13 +2378,15 @@ A `Tensor` or `SparseTensor` with same shape as `x` with type `int64`.
 
 - - -
 
-## <a name="unpack"></a>unpack(num=None, axis=0, name=unpack)
+## <a name="unpack"></a>unpack()
 
 
 
-DEPRECATED: Use unstack.
+Unpacks the given dimension of a rank-`R` tensor into rank-`(R-1)` tensors. (deprecated)
 
-Unpacks the given dimension of a rank-`R` tensor into rank-`(R-1)` tensors.
+THIS FUNCTION IS DEPRECATED. It will be removed after 2016-12-14.
+Instructions for updating:
+This op will be removed after the deprecation date. Please switch to tf.unstack().
 
 Unpacks `num` tensors from `value` by chipping it along the `axis` dimension.
 If `num` is not specified (the default), it is inferred from `value`'s shape.
@@ -2398,7 +2404,7 @@ Etc.
 
 This is the opposite of pack.  The numpy equivalent is
 
-    tf.unpack(x, n) = list(x)
+tf.unpack(x, n) = list(x)
 
 #### Args:
 

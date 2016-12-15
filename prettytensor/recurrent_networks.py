@@ -162,7 +162,7 @@ def _lstm_state_sizes(unused_input, num_units, *unused_args, **unused_kwargs):
 def lstm_cell(input_layer,
               states,
               num_units,
-              bias=tf.zeros_initializer,
+              bias=tf.zeros_initializer(),
               peephole=True,
               weights=None,
               phase=prettytensor.Phase.train,
@@ -250,7 +250,7 @@ def _gru_state_sizes(unused_input, num_units, *unused_args, **unused_kwargs):
 def gru_cell(input_layer,
              state,
              num_units,
-             bias=tf.zeros_initializer,
+             bias=tf.zeros_initializer(),
              weights=None,
              phase=prettytensor.Phase.train,
              parameter_modifier=parameters.identity):

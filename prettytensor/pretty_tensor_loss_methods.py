@@ -327,20 +327,19 @@ def binary_cross_entropy_with_logits(input_,
 
 
 @prettytensor.RegisterCompoundOp(assign_defaults=('parameter_modifier',))
-def softmax_classifier_with_sampled_loss(
-    inputs,
-    num_classes,
-    labels,
-    num_sampled,
-    num_true=None,
-    sampled_values=None,
-    remove_accidental_hits=True,
-    loss_weight=None,
-    per_example_weights=None,
-    weights=None,
-    bias=tf.zeros_initializer,
-    parameter_modifier=parameters.identity,
-    name='softmax_classifier'):
+def softmax_classifier_with_sampled_loss(inputs,
+                                         num_classes,
+                                         labels,
+                                         num_sampled,
+                                         num_true=None,
+                                         sampled_values=None,
+                                         remove_accidental_hits=True,
+                                         loss_weight=None,
+                                         per_example_weights=None,
+                                         weights=None,
+                                         bias=tf.zeros_initializer(),
+                                         parameter_modifier=parameters.identity,
+                                         name='softmax_classifier'):
   """Applies softmax and if labels is not None, then it adds a sampled loss.
 
   This is a faster way to train a softmax classifier over a huge number of
@@ -443,7 +442,7 @@ def softmax_classifier(input_,
                        loss_weight=None,
                        per_example_weights=None,
                        weights=None,
-                       bias=tf.zeros_initializer,
+                       bias=tf.zeros_initializer(),
                        parameter_modifier=parameters.identity,
                        name=PROVIDED):
   """Creates a fully-connected linear layer followed by a softmax.
@@ -543,24 +542,21 @@ def evaluate_precision_recall(input_,
     dtype = tf.float32
     # Create the variables in all cases so that the load logic is easier.
     relevant_count = tf.get_variable(
-        'relevant_count',
-        [],
+        'relevant_count', [],
         dtype,
-        tf.zeros_initializer,
+        tf.zeros_initializer(),
         collections=[bookkeeper.GraphKeys.TEST_VARIABLES],
         trainable=False)
     retrieved_count = tf.get_variable(
-        'retrieved_count',
-        [],
+        'retrieved_count', [],
         dtype,
-        tf.zeros_initializer,
+        tf.zeros_initializer(),
         collections=[bookkeeper.GraphKeys.TEST_VARIABLES],
         trainable=False)
     selected_count = tf.get_variable(
-        'selected_count',
-        [],
+        'selected_count', [],
         dtype,
-        tf.zeros_initializer,
+        tf.zeros_initializer(),
         collections=[bookkeeper.GraphKeys.TEST_VARIABLES],
         trainable=False)
 

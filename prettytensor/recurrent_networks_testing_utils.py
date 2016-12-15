@@ -37,10 +37,10 @@ class SequenceInputMock(object):
       count = tf.get_variable('count_%s' % state_name,
                               [],
                               tf.int32,
-                              tf.zeros_initializer,
+                              tf.zeros_initializer(),
                               trainable=False)
       value = tf.get_variable(state_name, [self.batch_size, self.node_depth],
-                              tf.float32, tf.zeros_initializer)
+                              tf.float32, tf.zeros_initializer())
       self.requested_tensors[state_name] = (count, value)
 
     return self.requested_tensors[state_name][1]

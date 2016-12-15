@@ -23,9 +23,7 @@ from prettytensor import scopes
 
 
 def var_scoped_function():
-  return tf.get_variable('dummy',
-                         shape=[1],
-                         initializer=tf.zeros_initializer)
+  return tf.get_variable('dummy', shape=[1], initializer=tf.zeros_initializer())
 
 
 class ScopesTest(unittest.TestCase):
