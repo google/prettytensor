@@ -13,7 +13,7 @@ import fnmatch
 import os
 from setuptools import find_packages, setup, Extension
 
-_VERSION = '0.7.2'
+_VERSION = '0.7.3'
 
 REQUIRED_PACKAGES = [
     'enum34 >= 1.0.0',
