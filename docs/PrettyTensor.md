@@ -381,38 +381,6 @@ A PrettyTensor containing an array of tensors.
 
 - - -
 
-## <a name="complex_abs"></a>complex_abs(name=None)
-
-
-
-Computes the complex absolute value of a tensor.
-
-Given a tensor `x` of complex numbers, this operation returns a tensor of type
-`float32` or `float64` that is the absolute value of each element in `x`. All
-elements in `x` must be complex numbers of the form \\(a + bj\\). The
-absolute value is computed as \\( \sqrt{a^2 + b^2}\\).
-
-For example:
-
-```
-# tensor 'x' is [[-2.25 + 4.75j], [-3.25 + 5.75j]]
-tf.complex_abs(x) ==> [5.25594902, 6.60492229]
-```
-
-#### Args:
-
-
-* name: A name for the operation (optional).
-
-#### Returns:
-
-A `Tensor` of type `float32` or `float64`.
-
-
-
-
-- - -
-
 ## <a name="concat"></a>concat(concat_dim, other_tensors=None)
 
 
@@ -442,7 +410,7 @@ A new PrettyTensor.
 
 - - -
 
-## <a name="conv2d"></a>conv2d(kernel, depth, activation_fn=None, stride=(1, 1), l2loss=None, weights=None, bias=<function _initializer at 0x49e4aa0>, edges=SAME, batch_normalize=False, phase=train, parameter_modifier=<function identity at 0x4a81c08>, name=None)
+## <a name="conv2d"></a>conv2d(kernel, depth, activation_fn=None, stride=(1, 1), l2loss=None, weights=None, bias=<function _initializer at 0x451b7d0>, edges=SAME, batch_normalize=False, phase=train, parameter_modifier=<function identity at 0x47cf938>, name=None)
 
 
 
@@ -526,7 +494,7 @@ A loss.
 
 - - -
 
-## <a name="depthwise_conv2d"></a>depthwise_conv2d(kernel, channel_multiplier, activation_fn=None, stride=None, l2loss=None, weights=None, bias=<function _initializer at 0x49e4c08>, edges=SAME, batch_normalize=False, phase=train, parameter_modifier=<function identity at 0x4a81c08>, name=None)
+## <a name="depthwise_conv2d"></a>depthwise_conv2d(kernel, channel_multiplier, activation_fn=None, stride=None, l2loss=None, weights=None, bias=<function _initializer at 0x451b938>, edges=SAME, batch_normalize=False, phase=train, parameter_modifier=<function identity at 0x47cf938>, name=None)
 
 
 
@@ -586,7 +554,7 @@ Handle to the generated layer.
 
 - - -
 
-## <a name="diagonal_matrix_mul"></a>diagonal_matrix_mul(weights=None, l2loss=None, phase=train, parameter_modifier=<function identity at 0x4a81c08>)
+## <a name="diagonal_matrix_mul"></a>diagonal_matrix_mul(weights=None, l2loss=None, phase=train, parameter_modifier=<function identity at 0x47cf938>)
 
 
 
@@ -630,7 +598,7 @@ Aplies dropout if this is in the train phase.
 
 - - -
 
-## <a name="embedding_lookup"></a>embedding_lookup(embedding_count, embedding_shape, weights=None, phase=train, parameter_modifier=<function identity at 0x4a81c08>, name=None)
+## <a name="embedding_lookup"></a>embedding_lookup(embedding_count, embedding_shape, weights=None, phase=train, parameter_modifier=<function identity at 0x47cf938>, name=None)
 
 
 
@@ -904,7 +872,7 @@ A LayerWrapper with the flattened tensor.
 
 - - -
 
-## <a name="fully_connected"></a>fully_connected(size, activation_fn=None, l2loss=None, weights=None, bias=<function _initializer at 0x49f60c8>, transpose_weights=False, phase=train, parameter_modifier=<function identity at 0x4a81c08>, name=None)
+## <a name="fully_connected"></a>fully_connected(size, activation_fn=None, l2loss=None, weights=None, bias=<function _initializer at 0x4520d70>, transpose_weights=False, phase=train, parameter_modifier=<function identity at 0x47cf938>, name=None)
 
 
 
@@ -953,7 +921,7 @@ A Pretty Tensor handle to the layer.
 
 - - -
 
-## <a name="gru_cell"></a>gru_cell(state, num_units, bias=<function _initializer at 0x4a008c0>, weights=None, phase=train, parameter_modifier=<function identity at 0x4a81c08>)
+## <a name="gru_cell"></a>gru_cell(state, num_units, bias=<function _initializer at 0x4544578>, weights=None, phase=train, parameter_modifier=<function identity at 0x47cf938>)
 
 
 
@@ -1159,7 +1127,7 @@ A `Tensor`. Has the same type as `x`.
 
 - - -
 
-## <a name="lstm_cell"></a>lstm_cell(states, num_units, bias=<function _initializer at 0x4a00500>, peephole=True, weights=None, phase=train, parameter_modifier=<function identity at 0x4a81c08>)
+## <a name="lstm_cell"></a>lstm_cell(states, num_units, bias=<function _initializer at 0x45441b8>, peephole=True, weights=None, phase=train, parameter_modifier=<function identity at 0x47cf938>)
 
 
 
@@ -1942,7 +1910,7 @@ Computes the softmax.
 
 - - -
 
-## <a name="softmax_classifier"></a>softmax_classifier(num_classes, labels=None, loss_weight=None, per_example_weights=None, weights=None, bias=<function _initializer at 0x49e9f50>, parameter_modifier=<function identity at 0x4a81c08>, name=None)
+## <a name="softmax_classifier"></a>softmax_classifier(num_classes, labels=None, loss_weight=None, per_example_weights=None, weights=None, bias=<function _initializer at 0x451ec80>, parameter_modifier=<function identity at 0x47cf938>, name=None)
 
 
 
@@ -1979,7 +1947,7 @@ A named tuple holding:
 
 - - -
 
-## <a name="softmax_classifier_with_sampled_loss"></a>softmax_classifier_with_sampled_loss(num_classes, labels, num_sampled, num_true=None, sampled_values=None, remove_accidental_hits=True, loss_weight=None, per_example_weights=None, weights=None, bias=<function _initializer at 0x49e9de8>, parameter_modifier=<function identity at 0x4a81c08>, name=softmax_classifier)
+## <a name="softmax_classifier_with_sampled_loss"></a>softmax_classifier_with_sampled_loss(num_classes, labels, num_sampled, num_true=None, sampled_values=None, remove_accidental_hits=True, loss_weight=None, per_example_weights=None, weights=None, bias=<function _initializer at 0x451eb18>, parameter_modifier=<function identity at 0x47cf938>, name=softmax_classifier)
 
 
 

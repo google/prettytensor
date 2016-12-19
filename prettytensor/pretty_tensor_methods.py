@@ -712,7 +712,6 @@ prettytensor.Register(tf.nn.l2_normalize)
 
 # These should be expected because they match numpy.
 _strip_see(prettytensor.Register(tf.abs))
-prettytensor.Register(tf.complex_abs)
 prettytensor.Register(tf.log)
 prettytensor.Register(tf.sqrt)
 prettytensor.Register(tf.square)
