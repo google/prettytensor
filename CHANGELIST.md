@@ -1,3 +1,7 @@
+## 0.7.3
+
+1. Maintenance release w/ some deprecation notice fixes. Note: this may change the names of the summaries.
+
 ## 0.7.2
 
 1. Maintenance release w/ change to project pip dependencies to better support GPU builds.
