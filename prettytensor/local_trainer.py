@@ -87,7 +87,7 @@ class Runner(object):
     self._last_restore = None
     if self._save_path:
       self._logdir = logdir if logdir else os.path.dirname(self._save_path)
-      self._summary_writer = tf.train.SummaryWriter(self._logdir)
+      self._summary_writer = tf.summary.FileWriter(self._logdir)
     else:
       self._logdir = logdir
       self._summary_writer = None

@@ -62,7 +62,7 @@ def _tag_for(name):
   if index_of_end == -1:
     return _strip_colon(name)
   else:
-    return _strip_colon(name[index_of_end:])
+    return _strip_colon(name[index_of_end + 1:])
 
 
 def for_default_graph(*args, **kwargs):
