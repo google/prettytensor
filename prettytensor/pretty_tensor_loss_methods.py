@@ -208,13 +208,14 @@ def cross_entropy(input_,
   if correct_ratio.get_shape().is_fully_defined():
     input_.bookkeeper.add_average_summary(
         correct_ratio, 'average_accuracy_%s' % name)
-  return apply_regression(input_,
-                          tf.nn.softmax_cross_entropy_with_logits,
-                          labels,
-                          [],
-                          name='%s_loss' % name,
-                          loss_weight=loss_weight,
-                          per_example_weights=per_example_weights)
+  return apply_regression(
+      input_,
+      tf.contrib.nn.deprecated_flipped_softmax_cross_entropy_with_logits,
+      labels,
+      [],
+      name='%s_loss' % name,
+      loss_weight=loss_weight,
+      per_example_weights=per_example_weights)
 
 
 @prettytensor.Register
@@ -246,13 +247,14 @@ def sparse_cross_entropy(input_,
         per_example_weights,
         dtype=input_.dtype)
 
-  return apply_regression(input_,
-                          tf.nn.sparse_softmax_cross_entropy_with_logits,
-                          labels,
-                          [],
-                          name='%s_loss' % name,
-                          loss_weight=loss_weight,
-                          per_example_weights=per_example_weights)
+  return apply_regression(
+      input_,
+      tf.contrib.nn.deprecated_flipped_sparse_softmax_cross_entropy_with_logits,
+      labels,
+      [],
+      name='%s_loss' % name,
+      loss_weight=loss_weight,
+      per_example_weights=per_example_weights)
 
 
 @prettytensor.Register

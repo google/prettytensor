@@ -107,7 +107,7 @@ def main(_=None):
   # Because we are filling in a 2D array, the indices need to be 2 dimensional.
   # Since we want to assign 1 value for each row, the first dimension can just
   # be a sequence.
-  t = tf.concat_v2(
+  t = tf.concat(
       [
           tf.constant(
               numpy.arange(BATCH_SIZE).reshape((BATCH_SIZE, 1)),

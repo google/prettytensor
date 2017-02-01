@@ -335,7 +335,7 @@ A new PrettyTensor.
 
 - - -
 
-## <a name="conv2d"></a>conv2d(kernel, depth, activation_fn=None, stride=(1, 1), l2loss=None, weights=None, bias=<function _initializer at 0x451b7d0>, edges=SAME, batch_normalize=False, phase=train, parameter_modifier=<function identity at 0x47cf938>, name=None)
+## <a name="conv2d"></a>conv2d(kernel, depth, activation_fn=None, stride=(1, 1), l2loss=None, weights=None, bias=<google3.third_party.tensorflow.python.ops.init_ops.Zeros object at 0x3cf89d0>, edges=SAME, batch_normalize=False, phase=train, parameter_modifier=<function identity at 0x402faa0>, name=None)
 
 
 
@@ -419,7 +419,7 @@ A loss.
 
 - - -
 
-## <a name="depthwise_conv2d"></a>depthwise_conv2d(kernel, channel_multiplier, activation_fn=None, stride=None, l2loss=None, weights=None, bias=<function _initializer at 0x451b938>, edges=SAME, batch_normalize=False, phase=train, parameter_modifier=<function identity at 0x47cf938>, name=None)
+## <a name="depthwise_conv2d"></a>depthwise_conv2d(kernel, channel_multiplier, activation_fn=None, stride=None, l2loss=None, weights=None, bias=<google3.third_party.tensorflow.python.ops.init_ops.Zeros object at 0x3cf8a90>, edges=SAME, batch_normalize=False, phase=train, parameter_modifier=<function identity at 0x402faa0>, name=None)
 
 
 
@@ -479,7 +479,7 @@ Handle to the generated layer.
 
 - - -
 
-## <a name="diagonal_matrix_mul"></a>diagonal_matrix_mul(weights=None, l2loss=None, phase=train, parameter_modifier=<function identity at 0x47cf938>)
+## <a name="diagonal_matrix_mul"></a>diagonal_matrix_mul(weights=None, l2loss=None, phase=train, parameter_modifier=<function identity at 0x402faa0>)
 
 
 
@@ -523,7 +523,7 @@ Aplies dropout if this is in the train phase.
 
 - - -
 
-## <a name="embedding_lookup"></a>embedding_lookup(embedding_count, embedding_shape, weights=None, phase=train, parameter_modifier=<function identity at 0x47cf938>, name=None)
+## <a name="embedding_lookup"></a>embedding_lookup(embedding_count, embedding_shape, weights=None, phase=train, parameter_modifier=<function identity at 0x402faa0>, name=None)
 
 
 
@@ -797,7 +797,7 @@ A LayerWrapper with the flattened tensor.
 
 - - -
 
-## <a name="fully_connected"></a>fully_connected(size, activation_fn=None, l2loss=None, weights=None, bias=<function _initializer at 0x4520d70>, transpose_weights=False, phase=train, parameter_modifier=<function identity at 0x47cf938>, name=None)
+## <a name="fully_connected"></a>fully_connected(size, activation_fn=None, l2loss=None, weights=None, bias=<google3.third_party.tensorflow.python.ops.init_ops.Zeros object at 0x3d05410>, transpose_weights=False, phase=train, parameter_modifier=<function identity at 0x402faa0>, name=None)
 
 
 
@@ -846,7 +846,7 @@ A Pretty Tensor handle to the layer.
 
 - - -
 
-## <a name="gru_cell"></a>gru_cell(state, num_units, bias=<function _initializer at 0x4544578>, weights=None, phase=train, parameter_modifier=<function identity at 0x47cf938>)
+## <a name="gru_cell"></a>gru_cell(state, num_units, bias=<google3.third_party.tensorflow.python.ops.init_ops.Zeros object at 0x3f4d8d0>, weights=None, phase=train, parameter_modifier=<function identity at 0x402faa0>)
 
 
 
@@ -1052,7 +1052,7 @@ A `Tensor`. Has the same type as `x`.
 
 - - -
 
-## <a name="lstm_cell"></a>lstm_cell(states, num_units, bias=<function _initializer at 0x45441b8>, peephole=True, weights=None, phase=train, parameter_modifier=<function identity at 0x47cf938>)
+## <a name="lstm_cell"></a>lstm_cell(states, num_units, bias=<google3.third_party.tensorflow.python.ops.init_ops.Zeros object at 0x3f4d6d0>, peephole=True, weights=None, phase=train, parameter_modifier=<function identity at 0x402faa0>)
 
 
 
@@ -1159,58 +1159,6 @@ Handle to this layer.
 
 - - -
 
-## <a name="pack"></a>pack()
-
-
-
-Packs a list of rank-`R` tensors into one rank-`(R+1)` tensor. (deprecated)
-
-THIS FUNCTION IS DEPRECATED. It will be removed after 2016-12-14.
-Instructions for updating:
-This op will be removed after the deprecation date. Please switch to tf.stack().
-
-Packs the list of tensors in `values` into a tensor with rank one higher than
-each tensor in `values`, by packing them along the `axis` dimension.
-Given a list of length `N` of tensors of shape `(A, B, C)`;
-
-if `axis == 0` then the `output` tensor will have the shape `(N, A, B, C)`.
-if `axis == 1` then the `output` tensor will have the shape `(A, N, B, C)`.
-Etc.
-
-For example:
-
-```prettyprint
-# 'x' is [1, 4]
-# 'y' is [2, 5]
-# 'z' is [3, 6]
-pack([x, y, z]) => [[1, 4], [2, 5], [3, 6]]  # Pack along first dim.
-pack([x, y, z], axis=1) => [[1, 2, 3], [4, 5, 6]]
-```
-
-This is the opposite of unpack.  The numpy equivalent is
-
-tf.pack([x, y, z]) = np.asarray([x, y, z])
-
-#### Args:
-
-
-* axis: An `int`. The axis to pack along. Defaults to the first dimension.
- Supports negative indexes.
-* name: A name for this operation (optional).
-
-#### Returns:
-
-output: A packed `Tensor` with the same type as `values`.
-
-
-#### Raises:
-
-
-* ValueError: If `axis` is out of the range [-(R+1), R+1).
-
-
-- - -
-
 ## <a name="reduce_all"></a>reduce_all(axis=None, keep_dims=False, name=None, reduction_indices=None)
 
 
@@ -1312,10 +1260,7 @@ Joins a string Tensor across the given dimensions.
 Computes the string join across dimensions in the given string Tensor of shape
 `[d_0, d_1, ..., d_n-1]`.  Returns a new Tensor created by joining the input
 strings with the given separator (default: empty string).  Negative indices are
-counted backwards from the end, with `-1` being equivalent to `n - 1`.  Passing
-an empty `axis` joins all strings in linear index order and outputs
-a scalar string.
-
+counted backwards from the end, with `-1` being equivalent to `n - 1`.
 
 For example:
 
@@ -1859,7 +1804,7 @@ Computes the softmax.
 
 - - -
 
-## <a name="softmax_classifier"></a>softmax_classifier(num_classes, labels=None, loss_weight=None, per_example_weights=None, weights=None, bias=<function _initializer at 0x451ec80>, parameter_modifier=<function identity at 0x47cf938>, name=None)
+## <a name="softmax_classifier"></a>softmax_classifier(num_classes, labels=None, loss_weight=None, per_example_weights=None, weights=None, bias=<google3.third_party.tensorflow.python.ops.init_ops.Zeros object at 0x3cfbb50>, parameter_modifier=<function identity at 0x402faa0>, name=None)
 
 
 
@@ -1896,7 +1841,7 @@ A named tuple holding:
 
 - - -
 
-## <a name="softmax_classifier_with_sampled_loss"></a>softmax_classifier_with_sampled_loss(num_classes, labels, num_sampled, num_true=None, sampled_values=None, remove_accidental_hits=True, loss_weight=None, per_example_weights=None, weights=None, bias=<function _initializer at 0x451eb18>, parameter_modifier=<function identity at 0x47cf938>, name=softmax_classifier)
+## <a name="softmax_classifier_with_sampled_loss"></a>softmax_classifier_with_sampled_loss(num_classes, labels, num_sampled, num_true=None, sampled_values=None, remove_accidental_hits=True, loss_weight=None, per_example_weights=None, weights=None, bias=<google3.third_party.tensorflow.python.ops.init_ops.Zeros object at 0x3cfbad0>, parameter_modifier=<function identity at 0x402faa0>, name=softmax_classifier)
 
 
 
@@ -2152,6 +2097,54 @@ The sequeezed tensor.
 
 - - -
 
+## <a name="stack"></a>stack(axis=0, name=stack)
+
+
+
+Stacks a list of rank-`R` tensors into one rank-`(R+1)` tensor.
+
+Packs the list of tensors in `values` into a tensor with rank one higher than
+each tensor in `values`, by packing them along the `axis` dimension.
+Given a list of length `N` of tensors of shape `(A, B, C)`;
+
+if `axis == 0` then the `output` tensor will have the shape `(N, A, B, C)`.
+if `axis == 1` then the `output` tensor will have the shape `(A, N, B, C)`.
+Etc.
+
+For example:
+
+```prettyprint
+# 'x' is [1, 4]
+# 'y' is [2, 5]
+# 'z' is [3, 6]
+stack([x, y, z]) => [[1, 4], [2, 5], [3, 6]]  # Pack along first dim.
+stack([x, y, z], axis=1) => [[1, 2, 3], [4, 5, 6]]
+```
+
+This is the opposite of unstack.  The numpy equivalent is
+
+    tf.stack([x, y, z]) = np.asarray([x, y, z])
+
+#### Args:
+
+
+* axis: An `int`. The axis to stack along. Defaults to the first dimension.
+ Supports negative indexes.
+* name: A name for this operation (optional).
+
+#### Returns:
+
+output: A stacked `Tensor` with the same type as `values`.
+
+
+#### Raises:
+
+
+* ValueError: If `axis` is out of the range [-(R+1), R+1).
+
+
+- - -
+
 ## <a name="stop_gradient"></a>stop_gradient()
 
 
@@ -2346,15 +2339,11 @@ A `Tensor` or `SparseTensor` with same shape as `x` with type `int64`.
 
 - - -
 
-## <a name="unpack"></a>unpack()
+## <a name="unstack"></a>unstack(num=None, axis=0, name=unstack)
 
 
 
-Unpacks the given dimension of a rank-`R` tensor into rank-`(R-1)` tensors. (deprecated)
-
-THIS FUNCTION IS DEPRECATED. It will be removed after 2016-12-14.
-Instructions for updating:
-This op will be removed after the deprecation date. Please switch to tf.unstack().
+Unpacks the given dimension of a rank-`R` tensor into rank-`(R-1)` tensors.
 
 Unpacks `num` tensors from `value` by chipping it along the `axis` dimension.
 If `num` is not specified (the default), it is inferred from `value`'s shape.
@@ -2372,20 +2361,20 @@ Etc.
 
 This is the opposite of pack.  The numpy equivalent is
 
-tf.unpack(x, n) = list(x)
+    tf.unstack(x, n) = list(x)
 
 #### Args:
 
 
 * num: An `int`. The length of the dimension `axis`. Automatically inferred
  if `None` (the default).
-* axis: An `int`. The axis to unpack along. Defaults to the first
+* axis: An `int`. The axis to unstack along. Defaults to the first
  dimension. Supports negative indexes.
 * name: A name for the operation (optional).
 
 #### Returns:
 
-The list of `Tensor` objects unpacked from `value`.
+The list of `Tensor` objects unstacked from `value`.
 
 
 #### Raises:

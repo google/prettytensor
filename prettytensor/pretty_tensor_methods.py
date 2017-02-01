@@ -193,7 +193,7 @@ def reshape(input_layer, shape_spec):
   if len(reshape_tensor) == 1:
     reshape_tensor = reshape_tensor[0]
   else:
-    reshape_tensor = tf.concat_v2(reshape_tensor, 0)
+    reshape_tensor = tf.concat(reshape_tensor, 0)
   result = tf.reshape(input_layer, reshape_tensor)
   result.set_shape(new_shape)
 
@@ -519,7 +519,7 @@ def concat(input_layer, concat_dim, other_tensors=None):
   if not all_tensors:
     return prettytensor.wrap_sequence([])
   else:
-    return tf.concat_v2(all_tensors, concat_dim)
+    return tf.concat(all_tensors, concat_dim)
 
 
 @prettytensor.Register(method_name='slice')
@@ -716,8 +716,8 @@ prettytensor.Register(tf.log)
 prettytensor.Register(tf.sqrt)
 prettytensor.Register(tf.square)
 
-prettytensor.Register(tf.pack)
-prettytensor.Register(tf.unpack)
+prettytensor.Register(tf.stack)
+prettytensor.Register(tf.unstack)
 
 
 # Not strictly matching numpy, but reductions are along the same vein.

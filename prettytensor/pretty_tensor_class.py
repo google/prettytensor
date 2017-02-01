@@ -320,7 +320,7 @@ def join_pretty_tensors(tensors, output, join_function=None, name='join'):
     if join_function is None:
       # Use depth concat
       last_dim = len(tensors[0].shape) - 1
-      return output.with_tensor(tf.concat_v2(tensors, last_dim))
+      return output.with_tensor(tf.concat(tensors, last_dim))
     else:
       return output.with_tensor(join_function(tensors))
 
@@ -952,14 +952,16 @@ class Layer(PrettyTensor):
   def tensor(self):
     """Returns the tensor for this layer."""
     if self._sequence:
-      raise ValueError('This PrettyTensor is currently a sequence.')
+      raise ValueError('Expected this PrettyTensor to wrap a Tensor, but it '
+                       'currently wraps a sequence (list) of Tensors.')
     return self._tensor
 
   @property
   def sequence(self):
     """Returns the sequence for this layer."""
     if self._tensor is not None:
-      raise ValueError('This PrettyTensor is currently a Tensor.')
+      raise ValueError('Expected this PrettyTensor to wrap a sequence (list) '
+                       'of Tensors, but it currently wraps a Tensor.')
     return self._sequence
 
   def is_sequence(self):
